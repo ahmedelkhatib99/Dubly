@@ -157,5 +157,4 @@ class Encoder(nn.Module):
 
 encoder = Encoder()
 encoder.preprocess_dataset()
-encoder.load_melspectrograms()
 encoder.get_melspectrograms_for_training_iteration()
