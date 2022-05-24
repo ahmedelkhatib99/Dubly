@@ -5,31 +5,53 @@ import librosa
 import struct
 import webrtcvad
 import numpy as np
-from torch import nn
+from torch import nn, tensor, device, cuda
 from tqdm import tqdm
 from scipy.ndimage.morphology import binary_dilation
 
 
 class Encoder(nn.Module):
-    def __init__(self):
+    def __init__(self, device):
+        super().__init__()
         warnings.filterwarnings('ignore')
+        self.load_configs()
+        self.lstm = nn.LSTM(input_size=self.mel_channels_count,
+                            hidden_size=self.hidden_layer_size, 
+                            num_layers=self.layers_count, 
+                            batch_first=True).to(device)
+        self.lstm = nn.Linear(in_features=self.hidden_layer_size,
+                              out_features=self.embedding_size).to(device)
+        self.relu = nn.ReLU().to(device)
+        self.similarity_weight = nn.Parameter(tensor([10.0])).to(device)
+        self.similarity_bias = nn.Parameter(tensor([-5.0])).to(device)
+        self.loss_function = nn.CrossEntropyLoss().to(device)
+
+    def load_configs(self):
         self.dataset_path = os.path.join(
             os.path.dirname(__file__), "..\\..\\dataset")
         self.preprocessing_output_path = os.path.join(
             os.path.dirname(__file__), "..\\..\\output\\preprocessing")
+        
         with open(os.path.join(os.path.dirname(__file__), "..\\..\\configurations.yaml"), "r") as f:
             config = yaml.safe_load(f)
-        self.global_sampling_rate = config["PREPROCESSING"]["SAMPLING_RATE"]
-        self.average_amplitude_target_dBFS = config["PREPROCESSING"]["AMPLITUDE_DBFS"]
-        voice_activity_window_msecs = config["PREPROCESSING"]["VAD_WINDOW_MS"]
+        
+        self.global_sampling_rate = config["ENCODER"]["PREPROCESSING"]["SAMPLING_RATE"]
+        self.average_amplitude_target_dBFS = config["ENCODER"]["PREPROCESSING"]["AMPLITUDE_DBFS"]
+        voice_activity_window_msecs = config["ENCODER"]["PREPROCESSING"]["VAD_WINDOW_MS"]
         self.samples_per_voice_activity_window = (
             voice_activity_window_msecs * self.global_sampling_rate) // 1000
-        self.moving_average_width = config["PREPROCESSING"]["VAD_MOVING_AVG_WIDTH"]
-        self.mel_window_width = config["PREPROCESSING"]["MEL_WINDOW_WIDTH"]
-        self.mel_window_step = config["PREPROCESSING"]["MEL_WINDOW_STEP"]
-        self.mel_channels_count = config["PREPROCESSING"]["MEL_CHANNELS_COUNT"]
-        self.global_frames_count = config["PREPROCESSING"]["FRAMES_MIN_COUNT"]
-        self.mels_count_per_iteration = config["TRAINING"]["MELS_PER_TRAINING_ITERATION"]
+        self.moving_average_width = config["ENCODER"]["PREPROCESSING"]["VAD_MOVING_AVG_WIDTH"]
+        
+        self.mel_window_width = config["ENCODER"]["MEL_SPECTROGRAM"]["MEL_WINDOW_WIDTH"]
+        self.mel_window_step = config["ENCODER"]["MEL_SPECTROGRAM"]["MEL_WINDOW_STEP"]
+        self.mel_channels_count = config["ENCODER"]["MEL_SPECTROGRAM"]["MEL_CHANNELS_COUNT"]
+        self.global_frames_count = config["ENCODER"]["MEL_SPECTROGRAM"]["FRAMES_MIN_COUNT"]
+        
+        self.layers_count = config["ENCODER"]["MODEL"]["LAYERS_COUNT"]
+        self.hidden_layer_size = config["ENCODER"]["MODEL"]["HIDDEN_LAYER_SIZE"]
+        self.embedding_size = config["ENCODER"]["MODEL"]["EMBEDDING_SIZE"]
+        
+        self.mels_count_per_iteration = config["ENCODER"]["TRAINING"]["MELS_PER_TRAINING_ITERATION"]
         self.last_training_index = 0
 
     def preprocess_dataset(self):
@@ -154,7 +176,7 @@ class Encoder(nn.Module):
         for mel_file in tqdm(os.listdir(self.preprocessing_output_path), desc="Loading mel spectrograms"):
             self.loaded_mels.append(np.load(self.preprocessing_output_path + "\\" + mel_file))
     
-
-encoder = Encoder()
+device = device("cuda" if cuda.is_available() else "cpu")
+encoder = Encoder(device)
 encoder.preprocess_dataset()
 encoder.get_melspectrograms_for_training_iteration()
