@@ -1,14 +1,18 @@
+import warnings
 import os
 import yaml
 import librosa
 import struct
 import webrtcvad
 import numpy as np
+from torch import nn
+from tqdm import tqdm
 from scipy.ndimage.morphology import binary_dilation
 
 
-class Encoder:
+class Encoder(nn.Module):
     def __init__(self):
+        warnings.filterwarnings('ignore')
         self.dataset_path = os.path.join(
             os.path.dirname(__file__), "..\\..\\dataset")
         self.preprocessing_output_path = os.path.join(
@@ -24,7 +28,9 @@ class Encoder:
         self.mel_window_width = config["PREPROCESSING"]["MEL_WINDOW_WIDTH"]
         self.mel_window_step = config["PREPROCESSING"]["MEL_WINDOW_STEP"]
         self.mel_channels_count = config["PREPROCESSING"]["MEL_CHANNELS_COUNT"]
-        self.frames_min_count = config["PREPROCESSING"]["FRAMES_MIN_COUNT"]
+        self.global_frames_count = config["PREPROCESSING"]["FRAMES_MIN_COUNT"]
+        self.mels_count_per_iteration = config["TRAINING"]["MELS_PER_TRAINING_ITERATION"]
+        self.last_training_index = 0
 
     def preprocess_dataset(self):
         speakers_dirs = [self.dataset_path + "\\" +
@@ -34,7 +40,7 @@ class Encoder:
 
         for speaker in speakers_with_audios:
             for speaker_path, audios_paths in speaker.items():
-                for audio_path in audios_paths:
+                for audio_path in tqdm(audios_paths, desc="Preprocessing "+speaker_path.split("\\")[-1]):
                     audio = self.get_audio_and_sampling_rate(audio_path)
                     audio = self.normalize_amplitude(audio)
                     audio = self.trim_extra(audio)
@@ -48,7 +54,7 @@ class Encoder:
                         is_window_contains_speech)
                     audio_samples = audio[sample_positions]
                     mel_frames = self.get_mel_frames(audio_samples)
-                    if len(mel_frames) < self.frames_min_count:
+                    if len(mel_frames) < self.global_frames_count:
                         continue
                     else:
                         self.save_mel(mel_frames, audio_path)
@@ -123,6 +129,33 @@ class Encoder:
     def get_speaker_audios(speaker_dir):
         return [speaker_dir + "\\" + file for file in os.listdir(speaker_dir) if os.path.isfile(speaker_dir + "\\" + file) and file.endswith(".mp3")]
 
+    def get_melspectrograms_for_training_iteration(self):
+        self.load_melspectrograms()
+        mels_start = self.last_training_index
+        mels_end = len(self.loaded_mels) if self.last_training_index + self.mels_count_per_iteration > len(self.loaded_mels) else self.last_training_index + self.mels_count_per_iteration
+        self.last_training_index = mels_end
+        training_mels = self.loaded_mels[mels_start: mels_end]
+        training_frames = self.extract_frames_from_training_mels(training_mels)
+        return training_frames
+
+    def extract_frames_from_training_mels(self, training_mels):
+        frames = []
+        for mel in tqdm(training_mels, desc="Extracting training frames"):
+            if mel.shape[0] == self.global_frames_count:
+                mel_sample_start = 0
+            else:
+                mel_sample_start = np.random.randint(0, mel.shape[0] - self.global_frames_count)
+            mel_sample_end = mel_sample_start + self.global_frames_count
+            frames.append(mel[mel_sample_start: mel_sample_end])
+        return frames 
+
+    def load_melspectrograms(self):
+        self.loaded_mels = []
+        for mel_file in tqdm(os.listdir(self.preprocessing_output_path), desc="Loading mel spectrograms"):
+            self.loaded_mels.append(np.load(self.preprocessing_output_path + "\\" + mel_file))
+    
 
 encoder = Encoder()
 encoder.preprocess_dataset()
+encoder.load_melspectrograms()
+encoder.get_melspectrograms_for_training_iteration()
