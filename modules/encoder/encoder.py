@@ -26,7 +26,7 @@ class Encoder:
         self.mel_channels_count = config["PREPROCESSING"]["MEL_CHANNELS_COUNT"]
         self.frames_min_count = config["PREPROCESSING"]["FRAMES_MIN_COUNT"]
 
-    def load_dataset(self):
+    def preprocess_dataset(self):
         speakers_dirs = [self.dataset_path + "\\" +
                          subdir for subdir in os.listdir(self.dataset_path)]
         speakers_with_audios = [{speaker_dir: self.get_speaker_audios(
@@ -125,4 +125,4 @@ class Encoder:
 
 
 encoder = Encoder()
-encoder.load_dataset()
+encoder.preprocess_dataset()
