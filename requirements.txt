@@ -1,0 +1,8 @@
+librosa==0.8.1
+numpy==1.20.3
+PyYAML==6.0
+scikit_learn==1.1.1
+scipy==1.7.3
+torch==1.11.0
+tqdm==4.62.3
+webrtcvad==2.0.10
