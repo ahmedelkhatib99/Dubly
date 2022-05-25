@@ -5,7 +5,12 @@ __pycache__/
 
 # Dataset
 dataset/
+
+# Preprocessing Output
 output/
+
+# Models
+models/
 
 # C extensions
 *.so

@@ -5,7 +5,8 @@ import librosa
 import struct
 import webrtcvad
 import numpy as np
-from torch import nn, tensor, device, cuda, from_numpy, Tensor, save, optim, no_grad, mean, norm, sum, zeros
+from statistics import mean
+from torch import embedding, nn, tensor, device, cuda, from_numpy, Tensor, save, optim, no_grad, mean, norm, sum, zeros, load, as_tensor
 from torch.nn.utils import clip_grad_norm_
 from tqdm import tqdm
 from scipy.ndimage.morphology import binary_dilation
@@ -25,13 +26,14 @@ class Encoder(nn.Module):
                             hidden_size=self.hidden_layer_size,
                             num_layers=self.layers_count,
                             batch_first=True).to(device)
-        self.lstm = nn.Linear(in_features=self.hidden_layer_size,
+        self.linear = nn.Linear(in_features=self.hidden_layer_size,
                               out_features=self.embedding_size).to(device)
         self.relu = nn.ReLU().to(device)
         self.similarity_weight = nn.Parameter(tensor([10.0])).to(device)
         self.similarity_bias = nn.Parameter(tensor([-5.0])).to(device)
         self.loss_function = nn.CrossEntropyLoss().to(device)
-        self.training_iterations_count = 0
+        self.optimizer = optim.Adam(self.parameters(), lr=self.initial_learning_rate)
+        self.current_training_iteration = 0
         self.device = device
 
     def load_configs(self):
@@ -39,6 +41,8 @@ class Encoder(nn.Module):
             os.path.dirname(__file__), "..\\..\\dataset")
         self.preprocessing_output_path = os.path.join(
             os.path.dirname(__file__), "..\\..\\output\\preprocessing")
+        self.models_folder = os.path.join(
+            os.path.dirname(__file__), "..\\..\\models")
 
         with open(os.path.join(os.path.dirname(__file__), "..\\..\\configurations.yaml"), "r") as f:
             config = yaml.safe_load(f)
@@ -59,7 +63,10 @@ class Encoder(nn.Module):
         self.hidden_layer_size = config["ENCODER"]["MODEL"]["HIDDEN_LAYER_SIZE"]
         self.embedding_size = config["ENCODER"]["MODEL"]["EMBEDDING_SIZE"]
 
+        self.checkpoint_frequency = config["ENCODER"]["TRAINING"]["CHECKPOINT_FREQUENCY"]
+        self.training_iterations_count = config["ENCODER"]["TRAINING"]["TRAINING_ITERATIONS_COUNT"]
         self.mels_count_per_iteration = config["ENCODER"]["TRAINING"]["MELS_PER_TRAINING_ITERATION"]
+        self.initial_learning_rate = config["ENCODER"]["TRAINING"]["INIT_LEARNING_RATE"]
 
         self.losses = []
         self.equal_error_rates = []
@@ -90,6 +97,12 @@ class Encoder(nn.Module):
                         continue
                     else:
                         self.save_mel(mel_frames, audio_path)
+
+    def forward(self, samples, hidden_init=None):
+        _, (hidden, _) = self.lstm(samples, hidden_init)
+        unnormalized_embeddings = self.relu(self.linear(hidden[-1]))
+        normalized_embeddings = unnormalized_embeddings / (norm(unnormalized_embeddings, dim=1, keepdim=True) + 1e-5)
+        return normalized_embeddings
 
     def save_mel(self, mel_frames, audio_path):
         np.save(self.preprocessing_output_path + "\\" +
@@ -162,7 +175,7 @@ class Encoder(nn.Module):
         return [speaker_dir + "\\" + file for file in os.listdir(speaker_dir) if os.path.isfile(speaker_dir + "\\" + file) and file.endswith(".mp3")]
 
     def get_melspectrograms_for_training_iteration(self):
-        mels_start = self.training_iterations_count * self.mels_count_per_iteration
+        mels_start = self.current_training_iteration * self.mels_count_per_iteration
         mels_end = len(self.loaded_mels) if mels_start + self.mels_count_per_iteration > len(
             self.loaded_mels) else mels_start + self.mels_count_per_iteration
         training_mels = self.loaded_mels[mels_start: mels_end]
@@ -188,21 +201,22 @@ class Encoder(nn.Module):
                 np.load(self.preprocessing_output_path + "\\" + mel_file))
 
     def reshape_embeddings(self, embeddings: Tensor):
-        return embeddings.view((self.mels_count_per_iteration, self.global_frames_count, INFERRED_DIMENSION)).to(self.device)
+        return embeddings.view((embeddings.shape[0], self.global_frames_count, INFERRED_DIMENSION)).to(self.device)
 
-    def do_training_iteration(self, encoder_model: nn.Module, optimizer: optim.Adam):
+    def do_training_iteration(self):
         training_mels = self.get_melspectrograms_for_training_iteration()
-        loss = self.do_forward_pass(training_mels)
-        self.do_backward_pass(encoder_model, optimizer, loss)
-        self.training_iterations_count += 1
-        print("\nStep #" + str(self.training_iterations_count) + " --> Loss: " +
-              np.mean(self.losses) + "   Equal Error Rate: " + np.mean(self.equal_error_rates))
-        if self.training_iterations_count % 10 == 0:
-            save({"step": self.training_iterations_count, "model_state": encoder_model.state_dict(
-            ), "optimizer_state": optimizer.state_dict()}, "encoder.pt")
+        if (list(training_mels.size())[0] > 0):
+            loss = self.do_forward_pass(training_mels)
+            self.do_backward_pass(loss)
+            self.current_training_iteration += 1
+            print("\nStep #" + str(self.current_training_iteration) + " --> Loss: " +
+                str(mean(as_tensor(self.losses)).numpy()) + "   Equal Error Rate: " + str(mean(as_tensor(self.equal_error_rates)).numpy()))
+            if self.current_training_iteration % self.checkpoint_frequency == 0:
+                save({"iteration": self.current_training_iteration, "model_state": self.state_dict(
+                ), "optimizer_state": self.optimizer.state_dict()}, self.models_folder + "\\encoder.pt")
 
     def do_forward_pass(self, training_mels):
-        embeddings = self(training_mels)
+        embeddings = self(training_mels.data)
         embeddings = self.reshape_embeddings(embeddings)
         return self.loss(embeddings)
 
@@ -256,22 +270,39 @@ class Encoder(nn.Module):
                 lambda x: 1. - x - interp1d(false_positive_rates, true_positive_rate)(x), 0.0, 1.0)
         return equal_error_rate
 
-    def do_backward_pass(self, encoder_model: nn.Module, optimizer: optim.Adam, loss):
-        encoder_model.zero_grad()
+    def do_backward_pass(self, loss):
+        self.zero_grad()
         loss.backward()
         self.update_gradients()
-        optimizer.step()
+        self.optimizer.step()
 
     def update_gradients(self):
         self.similarity_weight.grad *= 0.01
         self.similarity_bias.grad *= 0.01
         clip_grad_norm_(self.parameters(), 3, norm_type=2)
+    
+    def start_training(self):
+        checkpoint_path = self.models_folder + "\\encoder.pt"
+        if os.path.exists(checkpoint_path):
+            print("="*60+"\nStarting from encoder checkpoint!!\n"+"="*60)
+            checkpoint = load(checkpoint_path)
+            self.current_training_iteration = checkpoint["iteration"]
+            self.load_state_dict(checkpoint["model_state"])
+            self.optimizer.load_state_dict(checkpoint["optimizer_state"])
+            self.optimizer.param_groups[0]["lr"] = self.initial_learning_rate
+        else:
+            print("="*60+"\nNo encoder checkpoint, starting over!!\n"+"="*60)
+        self.load_melspectrograms()
+        for i in range(self.training_iterations_count):
+            print("="*60+"\nIteration #"+str(i+1)+":\n"+"="*15)
+            self.do_training_iteration()
+    
+    def turn_on_training_mode(self):
+        self.train()
 
 
 device = device("cuda" if cuda.is_available() else "cpu")
 encoder = Encoder(device)
 encoder.preprocess_dataset()
-encoder.load_melspectrograms()
-encoder.get_melspectrograms_for_training_iteration()
-encoder.training_iterations_count += 1
-encoder.get_melspectrograms_for_training_iteration()
+encoder.turn_on_training_mode()
+encoder.start_training()
