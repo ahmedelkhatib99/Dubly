@@ -10,6 +10,7 @@ class EncoderConfiguration:
     should_preprocess: bool
     global_sampling_rate: int
     average_amplitude_target_dBFS: int
+    max_silence: int
     samples_per_voice_activity_window: int
     moving_average_width: int
     mel_window_width: int
@@ -41,6 +42,7 @@ class EncoderConfiguration:
         self.average_amplitude_target_dBFS = config[
             "ENCODER"]["PREPROCESSING"]["AMPLITUDE_DBFS"]
         voice_activity_window_msecs = config["ENCODER"]["PREPROCESSING"]["VAD_WINDOW_MS"]
+        self.max_silence = config["ENCODER"]["PREPROCESSING"]["MAX_SILENCE"]
         self.samples_per_voice_activity_window = (
             voice_activity_window_msecs * self.global_sampling_rate) // 1000
         self.moving_average_width = config["ENCODER"]["PREPROCESSING"]["VAD_MOVING_AVG_WIDTH"]

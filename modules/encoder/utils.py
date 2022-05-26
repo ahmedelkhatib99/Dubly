@@ -108,7 +108,7 @@ class EncoderUtils:
     @staticmethod
     def fill_gaps(configs: EncoderConfiguration, is_window_contains_speech):
         structure_element = np.ones(
-            configs.samples_per_voice_activity_window + 1)
+            configs.max_silence + 1)
         return binary_dilation(is_window_contains_speech, structure_element)
 
     @staticmethod
