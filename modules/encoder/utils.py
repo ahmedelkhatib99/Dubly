@@ -80,12 +80,12 @@ class EncoderUtils:
 
     @staticmethod
     def smooth_windows_containing_speech_detection(configs: EncoderConfiguration, is_window_contains_speech):
-        padded_flag_list = np.concatenate((np.zeros(
+        padded_is_window_contains_speech = np.concatenate((np.zeros(
             (configs.moving_average_width - 1) // 2), is_window_contains_speech, np.zeros(configs.moving_average_width // 2)))
-        smoothed_flag_list = np.cumsum(padded_flag_list, dtype=float)
-        smoothed_flag_list[configs.moving_average_width:] = smoothed_flag_list[configs.moving_average_width:] - \
-            smoothed_flag_list[:-configs.moving_average_width]
-        return smoothed_flag_list[configs.moving_average_width - 1:] / configs.moving_average_width
+        smoothed_is_window_contains_speech = np.cumsum(padded_is_window_contains_speech, dtype=float)
+        smoothed_is_window_contains_speech[configs.moving_average_width:] = smoothed_is_window_contains_speech[configs.moving_average_width:] - \
+            smoothed_is_window_contains_speech[:-configs.moving_average_width]
+        return smoothed_is_window_contains_speech[configs.moving_average_width - 1:] / configs.moving_average_width
 
     @staticmethod
     def get_sample_positions(configs: EncoderConfiguration, is_window_contains_speech):
