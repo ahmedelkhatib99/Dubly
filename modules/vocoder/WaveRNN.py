@@ -1,8 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from Vocoder.distribution import sample_from_discretized_mix_logistic
-from Vocoder.audio import *
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+from  modules.vocoder.distribution import sample_from_discretized_mix_logistic
+from  modules.vocoder.audio import *
 import time
 
 class ResBlock(nn.Module):

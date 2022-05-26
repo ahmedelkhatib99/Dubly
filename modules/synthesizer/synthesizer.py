@@ -5,12 +5,17 @@ import librosa
 from scipy import signal
 from scipy.ndimage.morphology import binary_dilation
 import struct
-from Synthesizer.tactron import Tacotron
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+from modules.synthesizer.tactron import Tacotron
 import torch
 import torch.nn.functional as F
 from torch import optim
 from collections import defaultdict
-from Synthesizer.symbols import int_to_text, text_to_int, symbols
+from modules.synthesizer.symbols import int_to_text, text_to_int, symbols
 
 try:
     import webrtcvad
@@ -161,7 +166,6 @@ class Synthesizer:
                        -self.max_abs_value, self.max_abs_value).astype(np.float32)
 
     def _stft(self, y,):
-
         return librosa.stft(y=y, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.win_length)
 
     def pad1d(self,x, max_len, pad_value=0):
@@ -319,7 +323,7 @@ class Synthesizer:
                 specs.append(m)
 
         return (specs, alignments) if return_alignments else specs
-    def train(self, preprocessor_dir, out_dir):
+    def start_training(self, preprocessor_dir, out_dir):
 
         # Load the dataset
         dataset = Path(preprocessor_dir)
@@ -327,7 +331,7 @@ class Synthesizer:
         audio_dir = out_dir.joinpath("audio")
         embed_dir = out_dir.joinpath("embed")
 
-        # Intialize output directories
+        # Initialize output directories
         out_dir = Path(out_dir)
         model_dir = out_dir.joinpath("model")
         model_dir.mkdir(exist_ok=True)

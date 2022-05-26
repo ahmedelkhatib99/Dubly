@@ -1,7 +1,11 @@
 import math
 import numpy as np
 import librosa
-import Vocoder.params as hp
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+import  modules.vocoder.params as hp
 from scipy.signal import lfilter
 import soundfile as sf
 
