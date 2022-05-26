@@ -1,4 +1,3 @@
-from utils import EncoderUtils
 import warnings
 import os
 import sys
@@ -11,8 +10,11 @@ from torch import tensor, from_numpy, save, mean, norm, sum, zeros, load, as_ten
 from torch.nn.utils import clip_grad_norm_
 from tqdm import tqdm
 
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(os.path.join(os.path.dirname(__file__), "."))
+from utils import EncoderUtils
 
+TRAINING_MODE = True
+SHOULD_SUPPRESS_NOISE = True
 
 class Encoder(nn.Module):
     def __init__(self, device):
@@ -81,26 +83,40 @@ class Encoder(nn.Module):
         for speaker in speakers_with_audios:
             for speaker_path, audios_paths in speaker.items():
                 for audio_path in tqdm(audios_paths, desc="Preprocessing "+speaker_path.split("\\")[-1]):
-                    audio = EncoderUtils.get_audio_with_correct_sampling_rate(self.global_sampling_rate, audio_path)
-                    audio = EncoderUtils.normalize_amplitude(self.average_amplitude_target_dBFS, audio)
-                    audio = EncoderUtils.trim_extra(self.samples_per_voice_activity_window, audio)
-                    pcm = EncoderUtils.get_16_bit_pulse_code_modulation(audio)
-                    voice_activity_detection = webrtcvad.Vad(mode=3)
-                    is_window_contains_speech = EncoderUtils.detect_windows_containing_speech(
-                        self.samples_per_voice_activity_window, self.global_sampling_rate, self.moving_average_width,
-                        audio, pcm, voice_activity_detection)
-                    is_window_contains_speech = EncoderUtils.fill_gaps(self.samples_per_voice_activity_window,
-                                                                       is_window_contains_speech)
-                    sample_positions = EncoderUtils.get_sample_positions(self.samples_per_voice_activity_window,
-                                                                         is_window_contains_speech)
-                    audio_samples = audio[sample_positions]
-                    mel_frames = EncoderUtils.get_mel_frames(
-                        self.global_sampling_rate, self.mel_window_width,
-                        self.mel_window_step, self.mel_channels_count, audio_samples)
+                    audio = self.get_audio(self.global_sampling_rate, self.average_amplitude_target_dBFS, self.samples_per_voice_activity_window, audio_path)
+                    mel_frames = self.convert_audio_to_mel_spectrogram_frames(self.global_sampling_rate, self.samples_per_voice_activity_window, 
+                                                                              self.moving_average_width, self.mel_window_step, 
+                                                                              self.mel_window_width, self.mel_channels_count, 
+                                                                              SHOULD_SUPPRESS_NOISE, audio)
                     if len(mel_frames) < self.global_frames_count:
                         continue
                     else:
                         EncoderUtils.save_mel(self.preprocessing_output_folder, mel_frames, audio_path)
+
+    def convert_audio_to_mel_spectrogram_frames(self, global_sampling_rate, samples_per_voice_activity_window, moving_average_width, mel_window_step, mel_window_width, mel_channels_count, should_suppress_noise, audio):
+        audio_samples = audio
+        if should_suppress_noise:
+            pcm = EncoderUtils.get_16_bit_pulse_code_modulation(audio)
+            voice_activity_detection = webrtcvad.Vad(mode=3)
+            is_window_contains_speech = EncoderUtils.detect_windows_containing_speech(
+                            samples_per_voice_activity_window, global_sampling_rate, moving_average_width,
+                            audio, pcm, voice_activity_detection)
+            is_window_contains_speech = EncoderUtils.fill_gaps(samples_per_voice_activity_window,
+                                                                        is_window_contains_speech)
+            sample_positions = EncoderUtils.get_sample_positions(samples_per_voice_activity_window,
+                                                                            is_window_contains_speech)
+            audio_samples = audio[sample_positions]
+        mel_frames = EncoderUtils.get_mel_frames(
+                        global_sampling_rate, mel_window_width,
+                        mel_window_step, mel_channels_count, audio_samples)
+            
+        return mel_frames
+
+    def get_audio(self, global_sampling_rate, average_amplitude_target_dBFS, samples_per_voice_activity_window, audio_path):
+        audio = EncoderUtils.get_audio_with_correct_sampling_rate(global_sampling_rate, audio_path)
+        audio = EncoderUtils.normalize_amplitude(average_amplitude_target_dBFS, audio)
+        audio = EncoderUtils.trim_extra(samples_per_voice_activity_window, audio)
+        return audio
 
     def forward(self, samples, hidden_init=None):
         _, (hidden, _) = self.lstm(samples, hidden_init)
@@ -162,17 +178,70 @@ class Encoder(nn.Module):
         checkpoint_path = self.models_folder + "\\encoder.pt"
         if os.path.exists(checkpoint_path):
             print("="*60+"\nStarting from encoder checkpoint!!\n"+"="*60)
-            checkpoint = load(checkpoint_path)
-            self.current_training_iteration = checkpoint["iteration"]
-            self.load_state_dict(checkpoint["model_state"])
-            self.optimizer.load_state_dict(checkpoint["optimizer_state"])
-            self.optimizer.param_groups[0]["lr"] = self.initial_learning_rate
+            self.load_model(checkpoint_path, TRAINING_MODE)
         else:
             print("="*60+"\nNo encoder checkpoint, starting over!!\n"+"="*60)
+        
+        self.turn_on_training_mode()
+        
         self.load_melspectrograms()
         for i in range(self.training_iterations_count):
             print("="*60+"\nIteration #"+str(i+1)+":\n"+"="*15)
             self.do_training_iteration()
 
+    def prepare_for_inference(self):
+        checkpoint_path = self.models_folder + "\\encoder.pt"
+        self.load_model(checkpoint_path, not TRAINING_MODE)
+        self.turn_off_training_mode()
+    
+    def get_partitioning_positions(self, audio_length):
+        samples_per_frame = int((self.global_sampling_rate * self.mel_window_step / 1000))
+        frames_count = int(np.ceil((audio_length + 1) / samples_per_frame))
+        step_size = max(int(np.round(self.global_frames_count * 0.5)), 1)
+        steps_count = max(1, frames_count - self.global_frames_count + step_size + 1)
+        audio_partition_positions = []
+        mel_partition_positions = []
+        for i in range(0, steps_count, step_size):
+            mel_partition = np.array([i, i + self.global_frames_count])
+            audio_partition = mel_partition * samples_per_frame
+            mel_partition_positions.append(slice(*mel_partition))
+            audio_partition_positions.append(slice(*audio_partition))
+        last_audio_parition_position = audio_partition_positions[-1]
+        coverage = (audio_length - last_audio_parition_position.start) / (last_audio_parition_position.stop - last_audio_parition_position.start)
+        if coverage < 0.75 and len(mel_partition_positions) > 1:
+            mel_partition_positions = mel_partition_positions[:-1]
+            audio_partition_positions = audio_partition_positions[:-1]
+
+        return audio_partition_positions, mel_partition_positions
+
+    def get_embeddings_from_audio(self, audio_path):
+        audio = self.get_audio(self.global_sampling_rate, self.average_amplitude_target_dBFS, self.samples_per_voice_activity_window, audio_path)
+        audio_partition_positions, mel_partition_positions = self.get_partitioning_positions(len(audio))
+        audio_end = audio_partition_positions[-1].stop
+        if audio_end >= len(audio):
+            audio = np.pad(audio, (0, audio_end - len(audio)), "constant")
+        mel_frames = self.convert_audio_to_mel_spectrogram_frames(self.global_sampling_rate, self.samples_per_voice_activity_window, 
+                                                                  self.moving_average_width, self.mel_window_step, 
+                                                                  self.mel_window_width, self.mel_channels_count, 
+                                                                  not SHOULD_SUPPRESS_NOISE, audio)
+        mel_paritions = np.array([mel_frames[partition] for partition in mel_partition_positions])
+        mel_paritions = from_numpy(mel_paritions).to(self.device)
+        partition_embeddings = self.forward(mel_paritions).detach().cpu().numpy()
+        embeddings_avg = np.mean(partition_embeddings, axis=0)
+        embeddings = embeddings_avg / np.linalg.norm(embeddings_avg, 2)
+        return embeddings
+
+    def load_model(self, checkpoint_path, training_mode):
+        assert os.path.exists(checkpoint_path) == True, "encoder.pt model doesn't exist, please train first!!"
+        checkpoint = load(checkpoint_path, self.device)
+        self.load_state_dict(checkpoint["model_state"])
+        if training_mode:
+            self.current_training_iteration = checkpoint["iteration"]
+            self.optimizer.load_state_dict(checkpoint["optimizer_state"])
+            self.optimizer.param_groups[0]["lr"] = self.initial_learning_rate
+    
     def turn_on_training_mode(self):
         self.train()
+    
+    def turn_off_training_mode(self):
+        self.eval()

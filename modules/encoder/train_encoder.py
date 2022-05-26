@@ -8,7 +8,6 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     encoder = Encoder(device)
     encoder.preprocess_dataset()
-    encoder.turn_on_training_mode()
     encoder.start_training()
 
 if __name__ == '__main__':
