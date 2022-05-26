@@ -12,6 +12,7 @@ output/
 # Models
 models/
 
+modules/synthesizer/dataset*
 # C extensions
 *.so
 
