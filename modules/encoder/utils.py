@@ -120,7 +120,7 @@ class EncoderUtils:
 
     @staticmethod
     def get_melspectrograms_for_training_iteration(configs: EncoderConfiguration, current_training_iteration, loaded_mels, device):
-        mels_start = current_training_iteration * configs.mels_count_per_iteration
+        mels_start = (current_training_iteration * configs.mels_count_per_iteration) % len(loaded_mels)
         mels_end = len(loaded_mels) if mels_start + configs.mels_count_per_iteration > len(loaded_mels) else mels_start + configs.mels_count_per_iteration
         training_mels = loaded_mels[mels_start: mels_end]
         training_frames = EncoderUtils.extract_frames_from_training_mels(configs, training_mels)
