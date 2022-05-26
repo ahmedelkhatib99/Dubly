@@ -149,7 +149,7 @@ class Encoder(nn.Module):
 
     def load_model(self, checkpoint_path, training_mode):
         assert os.path.exists(checkpoint_path) == True, "encoder.pt model doesn't exist, please train first!!"
-        checkpoint = load(checkpoint_path, self.device)
+        checkpoint = load(checkpoint_path)
         self.load_state_dict(checkpoint["model_state"])
         if training_mode:
             self.current_training_iteration = checkpoint["iteration"]

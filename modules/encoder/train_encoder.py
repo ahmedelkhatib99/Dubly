@@ -5,7 +5,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from encoder import Encoder
 
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     encoder = Encoder(device)
     encoder.preprocess_dataset()
     encoder.start_training()
