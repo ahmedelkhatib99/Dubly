@@ -3,21 +3,17 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Dataset
-dataset/
-
-# Preprocessing Output
-output/
-
-# Models
-models/
+# TTS
+TTS/dataset/
+TTS/output/
+TTS/models/
+TTS/modules/synthesizer/dataset*
+TTS/pipeline/common*
+TTS/pipeline/demo*
 
 # demo
 demo/
 
-modules/synthesizer/dataset*
-pipeline/common*
-pipeline/demo*
 # C extensions
 *.so
 
