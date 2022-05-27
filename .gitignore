@@ -11,6 +11,9 @@ TTS/modules/synthesizer/dataset*
 TTS/pipeline/common*
 TTS/pipeline/demo*
 
+# NMT
+NMT/translator-transformer/variables/variables.data-00000-of-00001
+
 # demo
 demo/
 
