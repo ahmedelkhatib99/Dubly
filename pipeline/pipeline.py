@@ -6,9 +6,9 @@ import soundfile as sf
 from tqdm import tqdm
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from modules.encoder.encoder import Encoder
-from modules.synthesizer.synthesizer import Synthesizer
-from modules.vocoder.vocoder import Vocoder
+from TTS.modules.encoder.encoder import Encoder
+from TTS.modules.synthesizer.synthesizer import Synthesizer
+from TTS.modules.vocoder.vocoder import Vocoder
 
 class TTS:
     def __init__(self):
@@ -16,9 +16,9 @@ class TTS:
         self.encoder = Encoder(device)
         self.encoder.prepare_for_inference()
         self.synthesizer = Synthesizer()
-        self.synthesizer.load_model(os.path.join(os.path.dirname(__file__), "..\\models\\synthesizer.pt"))
+        self.synthesizer.load_model(os.path.join(os.path.dirname(__file__), "..\\TTS\\models\\synthesizer.pt"))
         self.vocoder = Vocoder() 
-        self.vocoder.load_model(os.path.join(os.path.dirname(__file__), "..\\models\\vocoder.pt"))
+        self.vocoder.load_model(os.path.join(os.path.dirname(__file__), "..\\TTS\\models\\vocoder.pt"))
     
     def infere(self, audio_filename, text):
         audio_path = os.path.join(os.path.dirname(__file__), "..\\demo\\input\\"+audio_filename)
