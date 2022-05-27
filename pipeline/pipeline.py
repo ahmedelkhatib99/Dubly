@@ -11,7 +11,7 @@ from TTS.modules.synthesizer.synthesizer import Synthesizer
 from TTS.modules.vocoder.vocoder import Vocoder
 from NMT.transformer import *
 
-class TTS:
+class Pipeline:
     def __init__(self):
         device = torch.device("cpu")
         self.encoder = Encoder(device)
@@ -27,7 +27,7 @@ class TTS:
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
     
-    def infere(self, audio_filename, spanish_text):
+    def generate_english_to_spanish_speech(self, audio_filename, spanish_text):
         audio_path = self.input_folder + "\\" + audio_filename
         assert os.path.exists(audio_path) == True, "audio file doesn't exist, please ensure that it exists in \"demo\\input\" folder!!"
         p_bar = tqdm(range(4), desc="Generating English Audio (voice-cloned)", disable=False)
@@ -57,5 +57,5 @@ class TTS:
 
 
 if __name__ == "__main__":
-    tts = TTS()
-    tts.infere("./common_voice_es_24989771.mp3", ["Me encanta jugar con mis amigas", "me encanta mi colegio"])
+    pipeline = Pipeline()
+    pipeline.generate_english_to_spanish_speech("./common_voice_es_24989771.mp3", ["Me encanta jugar con mis amigas", "me encanta mi colegio"])
