@@ -9,6 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from TTS.modules.encoder.encoder import Encoder
 from TTS.modules.synthesizer.synthesizer import Synthesizer
 from TTS.modules.vocoder.vocoder import Vocoder
+from NMT.transformer import *
 
 class TTS:
     def __init__(self):
@@ -26,15 +27,18 @@ class TTS:
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
     
-    def infere(self, audio_filename, text):
+    def infere(self, audio_filename, spanish_text):
         audio_path = self.input_folder + "\\" + audio_filename
         assert os.path.exists(audio_path) == True, "audio file doesn't exist, please ensure that it exists in \"demo\\input\" folder!!"
         p_bar = tqdm(range(4), desc="Generating English Audio (voice-cloned)", disable=False)
 
+        english_text = translate(spanish_text, eng_custom_standardization=eng_custom_standardization, spa_custom_standardization=spa_custom_standardization)
+        print(english_text)
+
         embeddings = self.encoder.get_embeddings_from_audio(audio_path)
         p_bar.update(1)
 
-        texts = [text]
+        texts = [english_text]
         embeds = [embeddings]
         specs = self.synthesizer.synthesize_spectrograms(texts, embeds)
         spec = specs[0]
@@ -54,4 +58,4 @@ class TTS:
 
 if __name__ == "__main__":
     tts = TTS()
-    tts.infere("./common_voice_es_24989771.mp3", "I love to spend the weekend with my family, or to go play some games with the friends. Especially playing baseball and volleyball.")
+    tts.infere("./common_voice_es_24989771.mp3", ["Me encanta jugar con mis amigas", "me encanta mi colegio"])

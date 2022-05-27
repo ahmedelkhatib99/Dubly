@@ -1,3 +1,4 @@
+import os
 import pickle
 import string
 import re
@@ -6,17 +7,17 @@ import tensorflow as tf
 from keras.layers import TextVectorization
 
 def eng_custom_standardization(input_string):
-    eng_strip_chars = string.punctuation.replace("[", "")
-    eng_strip_chars = eng_strip_chars.replace("]", "")
-    lowercase = tf.strings.lower(input_string)
-    return tf.strings.regex_replace(lowercase, "[%s]" % re.escape(eng_strip_chars), "")
+        eng_strip_chars = string.punctuation.replace("[", "")
+        eng_strip_chars = eng_strip_chars.replace("]", "")
+        lowercase = tf.strings.lower(input_string)
+        return tf.strings.regex_replace(lowercase, "[%s]" % re.escape(eng_strip_chars), "")
 
 def spa_custom_standardization(input_string):
     spa_strip_chars = string.punctuation + "¿"
     lowercase = tf.strings.lower(input_string)
     return tf.strings.regex_replace(lowercase, "[%s]" % re.escape(spa_strip_chars), "")
 
-def translate(spa_texts):
+def translate(spa_texts, eng_custom_standardization, spa_custom_standardization):
     
     vocab_size = 15000
     sequence_length = 25
@@ -37,21 +38,21 @@ def translate(spa_texts):
     ##############################################
 
     #Loading transformer and vectorization of both languages
-    from_disk = pickle.load(open("spa_vectorization.pkl", "rb"))
+    from_disk = pickle.load(open(os.path.dirname(__file__) + "\\spa_vectorization.pkl", "rb"))
     spa_vectorization = TextVectorization.from_config(from_disk['config'])
     # You have to call `adapt` with some dummy data (BUG in Keras)
     spa_vectorization.adapt(tf.data.Dataset.from_tensor_slices(["xyz"]))
     spa_vectorization.set_weights(from_disk['weights'])
 
 
-    from_disk = pickle.load(open("eng_vectorization.pkl", "rb"))
+    from_disk = pickle.load(open(os.path.dirname(__file__) + "\\eng_vectorization.pkl", "rb"))
     eng_vectorization = TextVectorization.from_config(from_disk['config'])
     # You have to call `adapt` with some dummy data (BUG in Keras)
     eng_vectorization.adapt(tf.data.Dataset.from_tensor_slices(["xyz"]))
     eng_vectorization.set_weights(from_disk['weights'])
 
 
-    transformer = tf.saved_model.load('translator-transformer')
+    transformer = tf.saved_model.load(os.path.dirname(__file__) + '\\translator-transformer')
     ##############################################
 
     eng_vocab = eng_vectorization.get_vocabulary()
@@ -73,11 +74,8 @@ def translate(spa_texts):
 
             if sampled_token == "[end]":
                 break
+        decoded_sentence = decoded_sentence.replace("[start] ", "")
+        decoded_sentence = decoded_sentence.replace(" [end]", "")
+        decoded_sentence = decoded_sentence + "."
         eng_texts.append(decoded_sentence)
-    return eng_texts
-    ##############################################
-
-spa_texts = ['Esa es mi escuela.', 'No estaba borracho.', 'El anciano era querido por todos.', 'Quiero una respuesta a esa pregunta.', 'Pensé que tal vez quisieran saber.', 'En el alfabeto, la B va después de la A.', 'Cerrá los ojos por tres minutos.', 'Para mi sorpresa, ella no pudo contestar a la pregunta.', 'Ella participó en el concurso.', 'Me costó un rato largo el asimilar lo que ella estaba diciendo.']
-eng_texts = translate(spa_texts)
-print("=======================")
-print(eng_texts)
+    return ' '.join(eng_texts)
