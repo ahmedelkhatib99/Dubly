@@ -10,9 +10,15 @@ from TTS.modules.encoder.encoder import Encoder
 from TTS.modules.synthesizer.synthesizer import Synthesizer
 from TTS.modules.vocoder.vocoder import Vocoder
 from NMT.transformer import *
+from SpeechRecognizer.speech_recognizer import SpeechRecognizer
 
 class Pipeline:
     def __init__(self):
+
+        #################################################################### Speech Recognizer ####################################################################
+        self.speech_recognizer = SpeechRecognizer()
+
+        #################################################################### Voice Cloning #############################################################################
         device = torch.device("cpu")
         self.encoder = Encoder(device)
         self.encoder.prepare_for_inference()
@@ -27,12 +33,19 @@ class Pipeline:
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
     
-    def generate_spanish_to_english_speech(self, audio_filename, spanish_text):
+    def generate_spanish_to_english_speech(self,video_name):
+
+        speech_recognition_progress = tqdm(range(1), desc="Speech Recognition", disable=False)
+        spanish_text, audio_filename= self.speech_recognizer.get_text_of_audio(video_name)
+        speech_recognition_progress.update(1)
+        speech_recognition_progress.close()
+        
         audio_path = self.input_folder + "\\" + audio_filename
         assert os.path.exists(audio_path) == True, "audio file doesn't exist, please ensure that it exists in \"demo\\input\" folder!!"
 
         translation_progress = tqdm(range(1), desc="Translating to English", disable=False)
         english_text = translate(spanish_text, eng_custom_standardization=eng_custom_standardization, spa_custom_standardization=spa_custom_standardization)
+        print(english_text)
         translation_progress.update(1)
         translation_progress.close()
 
@@ -61,4 +74,5 @@ class Pipeline:
 
 if __name__ == "__main__":
     pipeline = Pipeline()
-    pipeline.generate_spanish_to_english_speech("./common_voice_es_24989771.mp3", ["Me encanta jugar con mis amigas", "me encanta mi colegio"])
+    pipeline.generate_spanish_to_english_speech("videotest.mp4")
+    # pipeline.generate_spanish_to_english_speech("./videotest_2.mp4", ["Me encanta jugar con mis amigas", "me encanta mi colegio"])

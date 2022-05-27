@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#Pipleline
+pipeline/Laurie*
+
 # TTS
 TTS/dataset/
 TTS/output/
