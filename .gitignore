@@ -4,12 +4,12 @@ __pycache__/
 *$py.class
 
 # TTS
-tts/dataset/
-tts/output/
-tts/models/
-tts/modules/synthesizer/dataset*
-tts/pipeline/common*
-tts/pipeline/demo*
+TTS/dataset/
+TTS/output/
+TTS/models/
+TTS/modules/synthesizer/dataset*
+TTS/pipeline/common*
+TTS/pipeline/demo*
 
 # demo
 demo/
