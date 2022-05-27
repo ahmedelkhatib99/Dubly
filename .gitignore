@@ -12,6 +12,9 @@ output/
 # Models
 models/
 
+# demo
+demo/
+
 modules/synthesizer/dataset*
 pipeline/common*
 pipeline/demo*
