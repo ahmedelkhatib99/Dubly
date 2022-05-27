@@ -345,7 +345,7 @@ class Tacotron(nn.Module):
         self.post_proj = nn.Linear(postnet_dims, fft_bins, bias=False)
 
         self.init_model()
-        self.num_params()
+        self.num_params(False)
 
         self.register_buffer("step", torch.zeros(1, dtype=torch.long))
         self.register_buffer("stop_threshold", torch.tensor(stop_threshold, dtype=torch.float32))

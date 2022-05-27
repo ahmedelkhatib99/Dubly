@@ -27,35 +27,38 @@ class Pipeline:
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
     
-    def generate_english_to_spanish_speech(self, audio_filename, spanish_text):
+    def generate_spanish_to_english_speech(self, audio_filename, spanish_text):
         audio_path = self.input_folder + "\\" + audio_filename
         assert os.path.exists(audio_path) == True, "audio file doesn't exist, please ensure that it exists in \"demo\\input\" folder!!"
-        p_bar = tqdm(range(4), desc="Generating English Audio (voice-cloned)", disable=False)
 
+        translation_progress = tqdm(range(1), desc="Translating to English", disable=False)
         english_text = translate(spanish_text, eng_custom_standardization=eng_custom_standardization, spa_custom_standardization=spa_custom_standardization)
-        print(english_text)
+        translation_progress.update(1)
+        translation_progress.close()
 
+        speech_generation_progress = tqdm(range(4), desc="Generating English Audio (voice-cloned)", disable=False)
         embeddings = self.encoder.get_embeddings_from_audio(audio_path)
-        p_bar.update(1)
+        speech_generation_progress.update(1)
 
         texts = [english_text]
         embeds = [embeddings]
         specs = self.synthesizer.synthesize_spectrograms(texts, embeds)
         spec = specs[0]
-        p_bar.update(2)
+        speech_generation_progress.update(1)
 
         generated_wav = self.vocoder.infer_waveform(spec)
         generated_wav = np.pad(generated_wav, (0, self.synthesizer.SAMPLING_RATE), mode="constant")
-        p_bar.update(3)
+        speech_generation_progress.update(1)
 
         num_generated = len(os.listdir(self.output_folder)) + 1
         output_filename = "\\generated_output_%02d.wav" % num_generated
         output_path = self.output_folder + output_filename
         sf.write(output_path, generated_wav.astype(np.float32), self.synthesizer.SAMPLING_RATE)
-        p_bar.update(4)
+        speech_generation_progress.update(1)
+        speech_generation_progress.close()
         print("\n"+"="*60 + "\nSaved output in \"demo\\output\" as %s\n" % output_filename + "="*60)
 
 
 if __name__ == "__main__":
     pipeline = Pipeline()
-    pipeline.generate_english_to_spanish_speech("./common_voice_es_24989771.mp3", ["Me encanta jugar con mis amigas", "me encanta mi colegio"])
+    pipeline.generate_spanish_to_english_speech("./common_voice_es_24989771.mp3", ["Me encanta jugar con mis amigas", "me encanta mi colegio"])

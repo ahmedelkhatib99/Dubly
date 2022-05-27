@@ -3,7 +3,9 @@ import pickle
 import string
 import re
 import numpy as np
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
+tf.get_logger().setLevel('INFO')
 from keras.layers import TextVectorization
 
 def eng_custom_standardization(input_string):
