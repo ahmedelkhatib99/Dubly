@@ -19,9 +19,15 @@ class TTS:
         self.synthesizer.load_model(os.path.join(os.path.dirname(__file__), "..\\TTS\\models\\synthesizer.pt"))
         self.vocoder = Vocoder() 
         self.vocoder.load_model(os.path.join(os.path.dirname(__file__), "..\\TTS\\models\\vocoder.pt"))
+        self.input_folder = os.path.join(os.path.dirname(__file__), "..\\demo\\input")
+        if not os.path.exists(self.input_folder):
+            os.makedirs(self.input_folder)
+        self.output_folder = os.path.join(os.path.dirname(__file__), "..\\demo\\output")
+        if not os.path.exists(self.output_folder):
+            os.makedirs(self.output_folder)
     
     def infere(self, audio_filename, text):
-        audio_path = os.path.join(os.path.dirname(__file__), "..\\demo\\input\\"+audio_filename)
+        audio_path = self.input_folder + "\\" + audio_filename
         assert os.path.exists(audio_path) == True, "audio file doesn't exist, please ensure that it exists in \"demo\\input\" folder!!"
         p_bar = tqdm(range(4), desc="Generating English Audio (voice-cloned)", disable=False)
 
@@ -38,10 +44,9 @@ class TTS:
         generated_wav = np.pad(generated_wav, (0, self.synthesizer.SAMPLING_RATE), mode="constant")
         p_bar.update(3)
 
-        output_folder = os.path.join(os.path.dirname(__file__), "..\\demo\\output")
-        num_generated = len(os.listdir(output_folder)) + 1
+        num_generated = len(os.listdir(self.output_folder)) + 1
         output_filename = "\\generated_output_%02d.wav" % num_generated
-        output_path = output_folder + output_filename
+        output_path = self.output_folder + output_filename
         sf.write(output_path, generated_wav.astype(np.float32), self.synthesizer.SAMPLING_RATE)
         p_bar.update(4)
         print("\n"+"="*60 + "\nSaved output in \"demo\\output\" as %s\n" % output_filename + "="*60)
