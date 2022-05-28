@@ -29,10 +29,10 @@ class VideoPipeline:
                 break
         self.lip_syncing.generate_video(self.input_folder + '\\' + video_name, 
                                         audio_file, 
-                                        self.output_folder + '\\' + video_name)
+                                        self.output_folder + '\\videos\\' + video_name)
         video_generation_progress.update(1)
         video_generation_progress.close()
-        print("\n"+"="*60 + "\nSaved video output in \"demo\\output\" as %s\n" %  (self.output_folder + '\\' + video_name) + "="*60)
+        print("\n"+"="*60 + "\nSaved video output in \"demo\\output\\videos\" as %s\n" %  video_name + "="*60)
 
 class SpeechToSpeechPipeline:
     def __init__(self):
@@ -54,7 +54,7 @@ class SpeechToSpeechPipeline:
             os.makedirs(self.input_folder)
         self.output_folder = os.path.join(os.path.dirname(__file__), "..\\demo\\output")
         if not os.path.exists(self.output_folder):
-            os.makedirs(self.output_folder)
+            os.makedirs(self.output_folder + "\\videos")
 
         
     def generate_spanish_to_english_speech(self,video_name):
@@ -89,7 +89,7 @@ class SpeechToSpeechPipeline:
         self.vocoder.delete_model_from_memory()
         torch.cuda.empty_cache()
 
-        num_generated = len(os.listdir(self.output_folder)) + 1
+        num_generated = len(os.listdir(self.output_folder)) - 1
         self.cloned_audio_filename = "\\generated_output_%02d.wav" % num_generated
         cloned_audio_path = self.output_folder + self.cloned_audio_filename
         sf.write(cloned_audio_path, generated_wav.astype(np.float32), self.synthesizer.SAMPLING_RATE)
@@ -108,7 +108,7 @@ def execute_video_pipeline(video_name):
     videoPipeline.generate_video(video_name)
 
 if __name__ == "__main__":
-    video_name = "Dixie.mp4"
+    video_name = "library1.mp4"
     speech_thread = threading.Thread(target=lambda: execute_speech_pipline(video_name))
     speech_thread.start()
     speech_thread.join()
