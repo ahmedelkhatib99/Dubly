@@ -50,7 +50,7 @@ def face_detect(images):
                 raise RuntimeError(
                     'Image too big to run face detection on GPU. Please use the --resize_factor argument')
             batch_size //= 2
-            print('Recovering from OOM error; New batch size: {}'.format(batch_size))
+            # print('Recovering from OOM error; New batch size: {}'.format(batch_size))
             continue
         break
 
@@ -90,7 +90,7 @@ def datagen(frames, mels):
         else:
             face_det_results = face_detect([frames[0]])
     else:
-        print('Using the specified bounding box instead of face detection...')
+        # print('Using the specified bounding box instead of face detection...')
         y1, y2, x1, x2 = args.box
         face_det_results = [
             [f[y1: y2, x1:x2], (y1, y2, x1, x2)] for f in frames]
@@ -135,7 +135,7 @@ def datagen(frames, mels):
 
 mel_step_size = 16
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-print('Using {} for inference.'.format(device))
+# print('Using {} for inference.'.format(device))
 
 
 def _load(checkpoint_path):
@@ -149,7 +149,7 @@ def _load(checkpoint_path):
 
 def load_model(path):
     model = Wav2Lip()
-    print("Load checkpoint from: {}".format(path))
+    # print("Load checkpoint from: {}".format(path))
     checkpoint = _load(path)
     s = checkpoint["state_dict"]
     new_s = {}
@@ -176,7 +176,7 @@ def main():
         video_stream = cv2.VideoCapture(args.face)
         fps = video_stream.get(cv2.CAP_PROP_FPS)
 
-        print('Reading video frames...')
+        # print('Reading video frames...')
 
         full_frames = []
         while 1:
@@ -201,11 +201,11 @@ def main():
 
             full_frames.append(frame)
 
-    print("Number of frames available for inference: "+str(len(full_frames)))
+    # print("Number of frames available for inference: "+str(len(full_frames)))
 
     if not args.audio.endswith('.wav'):
-        print('Extracting raw audio...')
-        command = 'ffmpeg -y -i {} -strict -2 {}'.format(
+        # print('Extracting raw audio...')
+        command = 'ffmpeg -y -i {} -strict -2 -hide_banner -loglevel error {}'.format(
             args.audio, 'temp/temp.wav')
 
         subprocess.call(command, shell=True)
@@ -213,7 +213,7 @@ def main():
 
     wav = audio.load_wav(args.audio, 16000)
     mel = audio.melspectrogram(wav)
-    print(mel.shape)
+    # print(mel.shape)
 
     if np.isnan(mel.reshape(-1)).sum() > 0:
         raise ValueError(
@@ -230,7 +230,7 @@ def main():
         mel_chunks.append(mel[:, start_idx: start_idx + mel_step_size])
         i += 1
 
-    print("Length of mel chunks: {}".format(len(mel_chunks)))
+    # print("Length of mel chunks: {}".format(len(mel_chunks)))
 
     full_frames = full_frames[:len(mel_chunks)]
 
@@ -240,16 +240,16 @@ def main():
     for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen,
                                                                     total=int(np.ceil(float(len(mel_chunks))/batch_size)))):
         if i == 0:
-            print(args.checkpoint_path)
+            # print(args.checkpoint_path)
             model = load_model(args.checkpoint_path)
-            print("Model loaded")
+            # print("Model loaded")
 
             frame_h, frame_w = full_frames[0].shape[:-1]
             out = cv2.VideoWriter(os.path.join(os.path.dirname(__file__), ".\\temp\\result.avi"),
                                   cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
 
         # device = 'cpu'
-        print('Memory Allocated' ,torch.cuda.memory_allocated())
+        # print('Memory Allocated' ,torch.cuda.memory_allocated())
 
         img_batch = torch.FloatTensor(
             np.transpose(img_batch, (0, 3, 1, 2))).to(device)
@@ -270,7 +270,7 @@ def main():
 
     out.release()
 
-    command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {}'.format(
+    command = 'ffmpeg -y -i {} -i {} -hide_banner -loglevel error -strict -2 -q:v 1 {}'.format(
         args.audio, os.path.join(os.path.dirname(__file__), ".\\temp\\result.avi"), args.outfile)
     subprocess.call(command, shell=platform.system() != 'Windows')
 
@@ -281,12 +281,12 @@ class LipSyncing:
         # cuda.get_current_device().reset()
         torch.cuda.empty_cache()
 
-        print('Memory Allocated' ,torch.cuda.memory_stats_as_nested_dict())
+        # print('Memory Allocated' ,torch.cuda.memory_stats_as_nested_dict())
         global args
         parser = argparse.ArgumentParser(
             description='Inference code to lip-sync videos in the wild using Wav2Lip models')
 
-        print(video_name, audio_file, out_file)
+        # print(video_name, audio_file, out_file)
 
         parser.add_argument('--checkpoint_path', type=str,
                             help='Name of saved checkpoint to load weights from',
@@ -336,7 +336,7 @@ class LipSyncing:
         args = parser.parse_args()
         args.img_size = 96
 
-        print(args.face)
+        # print(args.face)
         if os.path.isfile(args.face) and args.face.split('.')[1] in ['jpg', 'png', 'jpeg']:
             args.static = True
         main()

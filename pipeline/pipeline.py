@@ -1,6 +1,7 @@
 import os
 import sys
 import torch
+import threading
 import numpy as np
 import soundfile as sf
 from tqdm import tqdm
@@ -16,14 +17,22 @@ from LipSync.inference import LipSyncing
 class VideoPipeline:
     def __init__(self) -> None:
         self.lip_syncing = LipSyncing()
+        self.input_folder = os.path.join(os.path.dirname(__file__), "..\\demo\\input")
+        self.output_folder = os.path.join(os.path.dirname(__file__), "..\\demo\\output")
     
-    def generate_video(self, input_folder, output_folder, video_name, cloned_audio_name):
+    def generate_video(self, video_name):
         video_generation_progress = tqdm(range(1), desc="Generating Video", disable=False)
-        self.lip_syncing.generate_video(input_folder + '\\' + video_name, 
-                                        output_folder + "\\" + cloned_audio_name, 
-                                        output_folder + '\\' + video_name)
+        output_files = os.listdir(self.output_folder)
+        for i in range(len(output_files)-1, -1, -1):
+            if ".wav" in output_files[i]:
+                audio_file = self.output_folder + "\\" + output_files[i]
+                break
+        self.lip_syncing.generate_video(self.input_folder + '\\' + video_name, 
+                                        audio_file, 
+                                        self.output_folder + '\\' + video_name)
         video_generation_progress.update(1)
         video_generation_progress.close()
+        print("\n"+"="*60 + "\nSaved video output in \"demo\\output\" as %s\n" %  (self.output_folder + '\\' + video_name) + "="*60)
 
 class SpeechToSpeechPipeline:
     def __init__(self):
@@ -86,18 +95,24 @@ class SpeechToSpeechPipeline:
         sf.write(cloned_audio_path, generated_wav.astype(np.float32), self.synthesizer.SAMPLING_RATE)
         speech_generation_progress.update(1)
         speech_generation_progress.close()
-        print("\n"+"="*60 + "\nSaved output in \"demo\\output\" as %s\n" % self.cloned_audio_filename + "="*60)
+        print("\n"+"="*60 + "\nSaved audio output in \"demo\\output\" as %s\n" % self.cloned_audio_filename + "="*60)
         
         return self.input_folder, cloned_audio_path, video_name, self.output_folder
 
-if __name__ == "__main__":
+def execute_speech_pipline(video_name):
     speechPipeline = SpeechToSpeechPipeline()
-    video_name = "test_4.mp4"
     speechPipeline.generate_spanish_to_english_speech(video_name)
-    input_folder = speechPipeline.input_folder 
-    output_folder = speechPipeline.output_folder 
-    cloned_audio_filename = speechPipeline.cloned_audio_filename
-    del speechPipeline
 
+def execute_video_pipeline(video_name):
     videoPipeline = VideoPipeline()
-    videoPipeline.generate_video(input_folder, output_folder, video_name, cloned_audio_filename)
+    videoPipeline.generate_video(video_name)
+
+if __name__ == "__main__":
+    video_name = "Dixie.mp4"
+    speech_thread = threading.Thread(target=lambda: execute_speech_pipline(video_name))
+    speech_thread.start()
+    speech_thread.join()
+
+    video_thread = threading.Thread(target=lambda: execute_video_pipeline(video_name))
+    video_thread.start()
+    video_thread.join()
