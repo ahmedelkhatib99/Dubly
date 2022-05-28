@@ -1,4 +1,5 @@
 
+import gc
 from pathlib import Path
 import numpy as np
 import librosa
@@ -272,7 +273,9 @@ class Synthesizer:
 
         self._model.load(model_fpath)
         self._model.eval()
-    
+    def delete_model_from_memory(self):
+        self._model = None
+        gc.collect()
     def synthesize_spectrograms(self, texts,
                                 embeddings,
                                 return_alignments=False):

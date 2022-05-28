@@ -1,4 +1,5 @@
 
+import gc
 from modules.vocoder.WaveRNN import WaveRNN
 import modules.vocoder.params as hp
 import torch
@@ -9,6 +10,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 
 class Vocoder:
+    def delete_model_from_memory(self):
+        # self._model = None
+        self._model.to('cpu')
+        del self._model
+        torch.cuda.empty_cache()
+        # gc.collect()
     def load_model(self, weights_fpath, verbose=True):
 
         self._model = WaveRNN(

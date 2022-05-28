@@ -80,4 +80,5 @@ def translate(spa_texts, eng_custom_standardization, spa_custom_standardization)
         decoded_sentence = decoded_sentence.replace(" [end]", "")
         decoded_sentence = decoded_sentence + "."
         eng_texts.append(decoded_sentence)
+        
     return ' '.join(eng_texts)
