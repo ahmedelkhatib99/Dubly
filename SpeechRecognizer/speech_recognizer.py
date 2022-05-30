@@ -4,8 +4,12 @@ import speech_recognition as sr
 import moviepy.editor as mp
 import os
 from pathlib import Path
+from torch import package
 
 class SpeechRecognizer:
+    def __init__(self):
+        imp = package.PackageImporter('./models/v2_4lang_q.pt')
+        self.model = imp.load_pickle("te_model", "model")
     def get_text_of_audio(self, video_name):
         # Extract audio from video
         self.input_folder = os.path.join(
@@ -22,10 +26,17 @@ class SpeechRecognizer:
         try:
             text = r.recognize_google(audio_text, language='es-AR')
             print('Converting audio transcripts into text ...')
-            print(text)
+            text = self.model.enhance_text(text,'es')
         except Exception as e:
             print('Sorry.. run again...', e)
-        return [text] , audio_name +'.mp3'
+        result = []
+        temp = ""
+        for char in text:
+            temp+= char
+            if char in "?.!":
+                result.append(temp)
+                temp = ""
+        return result , audio_name +'.mp3'
 
 
 if __name__ == "__main__":
