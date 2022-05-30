@@ -8,7 +8,8 @@ from torch import package
 
 class SpeechRecognizer:
     def __init__(self):
-        imp = package.PackageImporter('./models/v2_4lang_q.pt')
+        imp = package.PackageImporter(os.path.join(
+            os.path.dirname(__file__), './models/v2_4lang_q.pt'))
         self.model = imp.load_pickle("te_model", "model")
     def get_text_of_audio(self, video_name):
         # Extract audio from video

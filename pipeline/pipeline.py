@@ -108,7 +108,7 @@ def execute_video_pipeline(video_name):
     videoPipeline.generate_video(video_name)
 
 if __name__ == "__main__":
-    video_name = "Dixie.mp4"
+    video_name = "videotest_2.mp4"
     speech_thread = threading.Thread(target=lambda: execute_speech_pipline(video_name))
     speech_thread.start()
     speech_thread.join()
