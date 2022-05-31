@@ -12,7 +12,7 @@ import json
 import subprocess
 import random
 import string
-from tqdm import tqdm
+# from tqdm import tqdm
 from glob import glob
 import torch
 import face_detection
@@ -42,7 +42,8 @@ def face_detect(images):
     while 1:
         predictions = []
         try:
-            for i in tqdm(range(0, len(images), batch_size)):
+            # for i in tqdm(range(0, len(images), batch_size)):
+            for i in range(0, len(images), batch_size):
                 predictions.extend(detector.get_detections_for_batch(
                     np.array(images[i:i + batch_size])))
         except RuntimeError:
@@ -237,8 +238,9 @@ def main():
     batch_size = args.wav2lip_batch_size
     gen = datagen(full_frames.copy(), mel_chunks)
 
-    for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen,
-                                                                    total=int(np.ceil(float(len(mel_chunks))/batch_size)))):
+    # for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen,
+    #                                                                 total=int(np.ceil(float(len(mel_chunks))/batch_size)))):
+    for i, (img_batch, mel_batch, frames, coords) in enumerate(gen):
         if i == 0:
             # print(args.checkpoint_path)
             model = load_model(args.checkpoint_path)

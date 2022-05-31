@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 
 class SpeechRecognizer:
+    def __init__(self, mode="silent"):
+        self.mode = mode
     def get_text_of_audio(self, video_name):
         # Extract audio from video
         self.input_folder = os.path.join(
@@ -13,16 +15,16 @@ class SpeechRecognizer:
         my_clip = mp.VideoFileClip(os.path.join(self.input_folder,video_name))
 
         audio_name = video_name.split('.')[0]
-        my_clip.audio.write_audiofile(os.path.join(self.input_folder,audio_name+'.wav'))
-        my_clip.audio.write_audiofile(os.path.join(self.input_folder,audio_name+'.mp3'))
+        my_clip.audio.write_audiofile(os.path.join(self.input_folder,audio_name+'.wav'), verbose=(self.mode=="verbose"), logger=(None if self.mode == "silent" else "bar"))
+        my_clip.audio.write_audiofile(os.path.join(self.input_folder,audio_name+'.mp3'), verbose=(self.mode=="verbose"), logger=(None if self.mode == "silent" else "bar"))
 
         r = sr.Recognizer()
         with sr.AudioFile(os.path.join(self.input_folder,audio_name+'.wav')) as source:
             audio_text = r.listen(source)
         try:
             text = r.recognize_google(audio_text, language='es-AR')
-            print('Converting audio transcripts into text ...')
-            print(text)
+            if self.mode=="verbose":
+                print('Converting audio transcripts into text ...')
         except Exception as e:
             print('Sorry.. run again...', e)
         return [text] , audio_name +'.mp3'
