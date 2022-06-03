@@ -36,7 +36,9 @@ class VideoPipeline:
             video_generation_progress.update(1)
             video_generation_progress.close()
             print("\n"+"="*60 + "\nSaved video output in \"demo\\output\\videos\" as %s\n" %  video_name + "="*60)
-        else: print(video_name)
+        else: 
+            print(video_name)
+            sys.stdout.flush()
 
 class SpeechToSpeechPipeline:
     def __init__(self, mode):
