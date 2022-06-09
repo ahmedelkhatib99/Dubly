@@ -1,6 +1,5 @@
 const spawn = require("child_process").spawn;
-const PythonShell = require('python-shell').PythonShell;
-
+var path = require('path')
 //translate
 exports.translate = async (req, res, next) => {
     try {
