@@ -121,21 +121,21 @@ def print_help_message():
 def main(argv):
     try:
         opts, _ = getopt.getopt(argv, "hf:m:")
+        if (len(opts) == 0) or (opts[0][0] == "-h") or not (opts[0][0] == "-f" and opts[1][0] == "-m" and (opts[1][1] in ["silent", "verbose"])):
+            print_help_message()
+        else:
+            video_name = opts[0][1]
+            mode = opts[1][1]
+            sys.argv = [sys.argv[0]]
+            speech_thread = threading.Thread(target=lambda: execute_speech_pipline(video_name, mode))
+            speech_thread.start()
+            speech_thread.join()
+
+            video_thread = threading.Thread(target=lambda: execute_video_pipeline(video_name, mode))
+            video_thread.start()
+            video_thread.join()
     except getopt.GetoptError:
         print_help_message()
-    if (len(opts) == 0) or (opts[0][0] == "-h") or not (opts[0][0] == "-f" and opts[1][0] == "-m" and (opts[1][1] in ["silent", "verbose"])):
-        print_help_message()
-    else:
-        video_name = opts[0][1]
-        mode = opts[1][1]
-        sys.argv = [sys.argv[0]]
-        speech_thread = threading.Thread(target=lambda: execute_speech_pipline(video_name, mode))
-        speech_thread.start()
-        speech_thread.join()
-
-        video_thread = threading.Thread(target=lambda: execute_video_pipeline(video_name, mode))
-        video_thread.start()
-        video_thread.join()
 
 if __name__ == "__main__":
     main(sys.argv[1:])

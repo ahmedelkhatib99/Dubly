@@ -8,9 +8,9 @@ from torch import tensor, from_numpy, save, mean, norm, load, as_tensor
 from torch.nn.utils import clip_grad_norm_
 from tqdm import tqdm
 
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from encoder.utils import EncoderUtils
-from encoder.encoder_config import EncoderConfiguration
+sys.path.append(os.path.join(os.path.dirname(__file__), "."))
+from utils import EncoderUtils
+from encoder_config import EncoderConfiguration
 
 TRAINING_MODE = True
 SHOULD_SUPPRESS_NOISE = True
@@ -65,13 +65,8 @@ class Encoder(nn.Module):
         normalized_embeddings = unnormalized_embeddings / (norm(unnormalized_embeddings, dim=1, keepdim=True) + 1e-5)
         return normalized_embeddings
 
-    def load_melspectrograms(self):
-        self.loaded_mels = []
-        for mel_file in tqdm(os.listdir(self.configs.preprocessing_output_folder), desc="Loading mel spectrograms"):
-            self.loaded_mels.append(np.load(self.configs.preprocessing_output_folder + "\\" + mel_file))
-
     def do_training_iteration(self):
-        training_mels = EncoderUtils.get_melspectrograms_for_training_iteration(self.configs, self.current_training_iteration, self.loaded_mels, self.device)
+        training_mels = EncoderUtils.get_melspectrograms_for_training_iteration(self.configs, self.current_training_iteration, self.device)
         if (list(training_mels.size())[0] > 0):
             loss = self.do_forward_pass(training_mels)
             self.do_backward_pass(loss)
@@ -81,7 +76,7 @@ class Encoder(nn.Module):
             if self.current_training_iteration % self.configs.checkpoint_frequency == 0:
                 if not os.path.exists(self.configs.models_folder):
                     os.makedirs(self.configs.models_folder)
-                save({"iteration": self.current_training_iteration, "model_state": self.state_dict(
+                save({"step": self.current_training_iteration, "model_state": self.state_dict(
                 ), "optimizer_state": self.optimizer.state_dict()}, self.configs.models_folder + "\\encoder.pt")
 
     def do_forward_pass(self, training_mels):
@@ -90,14 +85,14 @@ class Encoder(nn.Module):
         return self.loss(embeddings)
 
     def loss(self, embeddings):
-        mels_count, samples_per_mel = embeddings.shape[:2]
+        speakers_count, mels_count_per_speaker = embeddings.shape[:2]
 
-        sim_matrix = EncoderUtils.calculate_similarity_matrix(self.similarity_weight, self.similarity_bias, self.device, embeddings).reshape((mels_count * samples_per_mel, mels_count))
-        target_values = np.repeat(np.arange(mels_count), samples_per_mel)
+        sim_matrix = EncoderUtils.calculate_similarity_matrix(self.similarity_weight, self.similarity_bias, self.device, embeddings).reshape((speakers_count * mels_count_per_speaker, speakers_count))
+        target_values = np.repeat(np.arange(speakers_count), mels_count_per_speaker)
         loss = self.loss_function(sim_matrix, from_numpy(target_values).long().to(self.device))
         self.losses.append(loss)
 
-        equal_error_rate = EncoderUtils.calculate_equal_error_rate(mels_count, sim_matrix, target_values)
+        equal_error_rate = EncoderUtils.calculate_equal_error_rate(speakers_count, sim_matrix, target_values)
         self.equal_error_rates.append(equal_error_rate)
 
         return loss
@@ -123,7 +118,6 @@ class Encoder(nn.Module):
         
         self.turn_on_training_mode()
         
-        self.load_melspectrograms()
         for i in range(self.configs.training_iterations_count):
             print("="*60+"\nIteration #"+str(i+1)+":\n"+"="*15)
             self.do_training_iteration()
@@ -149,10 +143,10 @@ class Encoder(nn.Module):
 
     def load_model(self, checkpoint_path, training_mode):
         assert os.path.exists(checkpoint_path) == True, "encoder.pt model doesn't exist, please train first!!"
-        checkpoint = load(checkpoint_path)
+        checkpoint = load(checkpoint_path, map_location=self.device)
         self.load_state_dict(checkpoint["model_state"])
         if training_mode:
-            self.current_training_iteration = checkpoint["iteration"]
+            self.current_training_iteration = checkpoint["step"]
             self.optimizer.load_state_dict(checkpoint["optimizer_state"])
             self.optimizer.param_groups[0]["lr"] = self.configs.initial_learning_rate
     

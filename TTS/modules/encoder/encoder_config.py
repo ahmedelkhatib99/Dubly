@@ -22,7 +22,8 @@ class EncoderConfiguration:
     embedding_size: int
     checkpoint_frequency: int
     training_iterations_count: int
-    mels_count_per_iteration: int
+    speakers_count_per_iteration: int
+    mels_count_per_speaker: int
     initial_learning_rate: int
     
     def __init__(self):
@@ -57,8 +58,7 @@ class EncoderConfiguration:
         self.embedding_size = config["ENCODER"]["MODEL"]["EMBEDDING_SIZE"]
 
         self.checkpoint_frequency = config["ENCODER"]["TRAINING"]["CHECKPOINT_FREQUENCY"]
-        self.training_iterations_count = config[
-            "ENCODER"]["TRAINING"]["TRAINING_ITERATIONS_COUNT"]
-        self.mels_count_per_iteration = config[
-            "ENCODER"]["TRAINING"]["MELS_PER_TRAINING_ITERATION"]
+        self.training_iterations_count = config["ENCODER"]["TRAINING"]["TRAINING_ITERATIONS_COUNT"]
+        self.speakers_count_per_iteration = config["ENCODER"]["TRAINING"]["SPEAKERS_PER_ITERATION"]
+        self.mels_count_per_speaker = config["ENCODER"]["TRAINING"]["MELS_PER_SPEAKER"]
         self.initial_learning_rate = config["ENCODER"]["TRAINING"]["INIT_LEARNING_RATE"]

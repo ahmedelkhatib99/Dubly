@@ -2,6 +2,7 @@ import os, sys
 import librosa
 import webrtcvad
 import struct
+import random
 import numpy as np
 from torch import Tensor, no_grad, from_numpy, mean, norm, sum, zeros
 from tqdm import tqdm
@@ -113,16 +114,24 @@ class EncoderUtils:
 
     @staticmethod
     def save_mel(configs: EncoderConfiguration, mel_frames, audio_path):
-        if not os.path.exists(configs.preprocessing_output_folder):
-            os.makedirs(configs.preprocessing_output_folder)
-        np.save(configs.preprocessing_output_folder + "\\" +
-                os.path.split(audio_path)[1].split(".")[0]+'.npy', mel_frames)
+        output_folder = configs.preprocessing_output_folder + "\\" + os.path.dirname(audio_path).split("\\")[-1]
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+        np.save(output_folder + "\\" + os.path.split(audio_path)[1].split(".")[0]+'.npy', mel_frames)
 
     @staticmethod
-    def get_melspectrograms_for_training_iteration(configs: EncoderConfiguration, current_training_iteration, loaded_mels, device):
-        mels_start = (current_training_iteration * configs.mels_count_per_iteration) % len(loaded_mels)
-        mels_end = len(loaded_mels) if mels_start + configs.mels_count_per_iteration > len(loaded_mels) else mels_start + configs.mels_count_per_iteration
-        training_mels = loaded_mels[mels_start: mels_end]
+    def get_melspectrograms_for_training_iteration(configs: EncoderConfiguration, current_training_iteration, device):
+        speakers = os.listdir(configs.preprocessing_output_folder)
+        speakers_start = (current_training_iteration * configs.speakers_count_per_iteration) % len(speakers)
+        speakers_end = len(speakers) if speakers_start + configs.speakers_count_per_iteration > len(speakers) else speakers_start + configs.speakers_count_per_iteration
+        training_speakers = speakers[speakers_start: speakers_end]
+        training_mels = []
+        for speaker in tqdm(training_speakers, desc="Loading mel spectrograms"):
+            speaker_mels = os.listdir(configs.preprocessing_output_folder + "\\" + speaker)
+            for _ in range(configs.mels_count_per_speaker):
+                choice = configs.preprocessing_output_folder + "\\" + speaker + "\\" + random.choice(speaker_mels)
+                print("for " + speaker + " we choose: " + choice)
+                training_mels.append(np.load(choice))
         training_frames = EncoderUtils.extract_frames_from_training_mels(configs, training_mels)
         return from_numpy(np.array(training_frames)).to(device)
 
@@ -142,32 +151,26 @@ class EncoderUtils:
     @staticmethod
     def calculate_similarity_matrix(similarity_weight, similarity_bias, device, embeddings):
 
-        mels_count, samples_per_mel = embeddings.shape[:2]
+        speakers_count, mels_count_per_speaker = embeddings.shape[:2]
 
-        mels_centroids = mean(embeddings, dim=1, keepdim=True)
-        mels_centroids = mels_centroids.clone(
-        ) / (norm(mels_centroids, dim=2, keepdim=True) + 1e-5)
+        speakers_centroids = mean(embeddings, dim=1, keepdim=True)
+        speakers_centroids = speakers_centroids.clone() / (norm(speakers_centroids, dim=2, keepdim=True) + 1e-5)
 
-        samples_centroids = (
-            sum(embeddings, dim=1, keepdim=True) - embeddings) / (samples_per_mel - 1)
-        samples_centroids = samples_centroids.clone(
-        ) / (norm(samples_centroids, dim=2, keepdim=True) + 1e-5)
+        centroids_excluding_speaker_mels = (sum(embeddings, dim=1, keepdim=True) - embeddings) / (mels_count_per_speaker - 1)
+        centroids_excluding_speaker_mels = centroids_excluding_speaker_mels.clone() / (norm(centroids_excluding_speaker_mels, dim=2, keepdim=True) + 1e-5)
 
-        similarity_matrix = zeros(
-            mels_count, samples_per_mel, mels_count).to(device)
-        all_mels_positions = 1 - np.eye(mels_count, dtype=np.int)
-        for mel_index in range(mels_count):
-            mel_positions = np.where(all_mels_positions[mel_index])[0]
-            similarity_matrix[mel_positions, :, mel_index] = (
-                embeddings[mel_positions] * mels_centroids[mel_index]).sum(dim=2)
-            similarity_matrix[mel_index, :, mel_index] = (
-                embeddings[mel_index] * samples_centroids[mel_index]).sum(dim=1)
+        similarity_matrix = zeros(speakers_count, mels_count_per_speaker, speakers_count).to(device)
+        speakers_positions = 1 - np.eye(speakers_count, dtype=np.int)
+        for speaker_index in range(speakers_count):
+            speaker_mels_positions = np.where(speakers_positions[speaker_index])[0]
+            similarity_matrix[speaker_mels_positions, :, speaker_index] = (embeddings[speaker_mels_positions] * speakers_centroids[speaker_index]).sum(dim=2)
+            similarity_matrix[speaker_index, :, speaker_index] = (embeddings[speaker_index] * centroids_excluding_speaker_mels[speaker_index]).sum(dim=1)
 
         return similarity_matrix * similarity_weight + similarity_bias
 
     @staticmethod
     def reshape_embeddings(configs: EncoderConfiguration, device, embeddings: Tensor):
-        return embeddings.view((embeddings.shape[0], configs.global_frames_count, INFERRED_DIMENSION)).to(device)
+        return embeddings.view((configs.speakers_count_per_iteration, configs.mels_count_per_speaker, INFERRED_DIMENSION)).to(device)
 
     @staticmethod
     def calculate_equal_error_rate(mels_count, sim_matrix, ground_truth):
