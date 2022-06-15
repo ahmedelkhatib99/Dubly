@@ -44,8 +44,7 @@ class EncoderConfiguration:
             "ENCODER"]["PREPROCESSING"]["AMPLITUDE_DBFS"]
         voice_activity_window_msecs = config["ENCODER"]["PREPROCESSING"]["VAD_WINDOW_MS"]
         self.max_silence = config["ENCODER"]["PREPROCESSING"]["MAX_SILENCE"]
-        self.samples_per_voice_activity_window = (
-            voice_activity_window_msecs * self.global_sampling_rate) // 1000
+        self.samples_per_voice_activity_window = (voice_activity_window_msecs * self.global_sampling_rate) // 1000
         self.moving_average_width = config["ENCODER"]["PREPROCESSING"]["VAD_MOVING_AVG_WIDTH"]
 
         self.mel_window_width = config["ENCODER"]["MEL_SPECTROGRAM"]["MEL_WINDOW_WIDTH"]
