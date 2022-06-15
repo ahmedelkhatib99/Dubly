@@ -21,7 +21,9 @@ MOST_AGRESSIVE = 3
 class EncoderUtils:
     @staticmethod
     def get_speaker_audios(speaker_dir):
-        """Returns the paths of audio files inside the directory of a certain speaker"""
+        """Returns the paths of audio files inside the directory of a certain speaker
+        """
+        
         return [speaker_dir + "\\" + file for file in os.listdir(speaker_dir) if os.path.isfile(speaker_dir + "\\" + file) and file.endswith(".mp3")]
 
     @staticmethod
@@ -35,6 +37,7 @@ class EncoderUtils:
             3- Fill silence gaps that are within the acceptable range.\n
             4- Sample the audio at the positions that are considered to contain voice only.\n
         """
+        
         audio_samples = audio
         if should_suppress_noise:
             voice_activity_detection = webrtcvad.Vad(mode=MOST_AGRESSIVE)
@@ -55,6 +58,7 @@ class EncoderUtils:
         then it is normalized and the length is adjusted to be an integer multiple of the window size
         in the configuration file
         """
+        
         audio = EncoderUtils.get_audio_with_correct_sampling_rate(configs, audio_path)
         audio = EncoderUtils.normalize_amplitude(configs, audio)
         audio = EncoderUtils.trim_extra(configs, audio)
@@ -67,6 +71,7 @@ class EncoderUtils:
         Sampling rate is checked against the global sampling rate configuration,
         if it doesn't match it, the audio is resampled
         """
+        
         audio, sampling_rate = librosa.load(audio_path, sr=None)
         if sampling_rate is not None and sampling_rate != configs.global_sampling_rate:
             audio = librosa.resample(audio, sampling_rate, configs.global_sampling_rate)
@@ -80,6 +85,7 @@ class EncoderUtils:
         this indicates that the mean value of the audio is below the required average amplitude
         thus the audio is normalized to meet the required average amplitude value
         """
+        
         amplitude_error_dbFS = configs.average_amplitude_target_dBFS - 10 * np.log10(np.mean(audio ** 2))
         if amplitude_error_dbFS > 0:
             audio = audio * (10 ** (amplitude_error_dbFS / 20))
@@ -89,6 +95,7 @@ class EncoderUtils:
     def trim_extra(configs: EncoderConfiguration, audio):
         """Returns audio that is an integer multiple of the number of samples equivalent to the voice window size in the configuration file
         """
+        
         return audio[:len(audio) - (len(audio) % configs.samples_per_voice_activity_window)]
 
     @staticmethod
@@ -103,7 +110,9 @@ class EncoderUtils:
         """Returns an array of boolean flags indicating position of windows containing speech
         
         pcm has to be a 16 bit integer representation of the audio sampled at the global sampling rate
-        NB: global sampling rate is required to be 8000, 16000, 32000 or 48000Hz. In our configuration it is 16000"""
+        NB: global sampling rate is required to be 8000, 16000, 32000 or 48000Hz. In our configuration it is 16000
+        """
+        
         is_contains_speech = []
         for start in range(0, len(audio), configs.samples_per_voice_activity_window):
             end = start + configs.samples_per_voice_activity_window
@@ -117,7 +126,9 @@ class EncoderUtils:
     def smooth_windows_containing_detected_speech(configs: EncoderConfiguration, is_window_contains_speech):
         """Returns a smoothed value of the voice detection flags
         
-        Applying a moving window average technique to consider the effect of neighboring windows in the detection"""
+        Applying a moving window average technique to consider the effect of neighboring windows in the detection
+        """
+        
         padded_is_window_contains_speech = np.concatenate((np.zeros((configs.moving_average_width - 1) // 2), is_window_contains_speech, np.zeros(configs.moving_average_width // 2)))
         smoothed_is_window_contains_speech = np.cumsum(padded_is_window_contains_speech, dtype=float)
         smoothed_is_window_contains_speech[configs.moving_average_width:] = smoothed_is_window_contains_speech[configs.moving_average_width:] - smoothed_is_window_contains_speech[:-configs.moving_average_width]
@@ -127,19 +138,19 @@ class EncoderUtils:
     def get_sample_positions(configs: EncoderConfiguration, is_window_contains_speech):
         """Return masks (i.e. windows of ones) corresponding to windows that are detected to contain speech
         """
+        
         return np.repeat(is_window_contains_speech, configs.samples_per_voice_activity_window)
 
     @staticmethod
     def get_mel_frames(configs: EncoderConfiguration, audio_samples):
         """Return melspectrogram frames representing the waveforms of the audio samples
         """
+        
         mel_frames = librosa.feature.melspectrogram(
             audio_samples,
             configs.global_sampling_rate,
-            n_fft=int(configs.global_sampling_rate *
-                      configs.mel_window_width / 1000),
-            hop_length=int(configs.global_sampling_rate *
-                           configs.mel_window_step / 1000),
+            n_fft=int(configs.global_sampling_rate * (configs.mel_window_width / 1000)),
+            hop_length=int(configs.global_sampling_rate * (configs.mel_window_step / 1000)),
             n_mels=configs.mel_channels_count
         )
         mel_frames = mel_frames.astype(np.float32).T
@@ -149,6 +160,7 @@ class EncoderUtils:
     def fill_gaps(configs: EncoderConfiguration, is_window_contains_speech):
         """Returns dilated flags to tolerate silences withing the acceptable range
         """
+        
         structure_element = np.ones(
             configs.max_silence + 1)
         return binary_dilation(is_window_contains_speech, structure_element)
@@ -168,7 +180,9 @@ class EncoderUtils:
         
         The training batch consists of a number of speakers equal to that in the configuration file,
         for each speaker a number of melspectrograms equal to that in the configuration file is chosen randomly
-        form the melspectrograms (corresponding to the preprocessed audios of the speaker) under the folder named after the speaker"""
+        form the melspectrograms (corresponding to the preprocessed audios of the speaker) under the folder named after the speaker
+        """
+        
         speakers = os.listdir(configs.preprocessing_output_folder)
         speakers_start = (current_training_iteration * configs.speakers_count_per_iteration) % len(speakers)
         speakers_end = len(speakers) if speakers_start + configs.speakers_count_per_iteration > len(speakers) else speakers_start + configs.speakers_count_per_iteration
@@ -184,10 +198,12 @@ class EncoderUtils:
 
     @staticmethod
     def extract_frames_from_training_mels(configs: EncoderConfiguration, training_mels):
-        """Returns a the frames corresponding to the melspectrograms of the training batch
+        """Returns the frames corresponding to the melspectrograms of the training batch
         
         If the number of frames in the melspectrogram exceeds the global frames count in the configuration file,
-        a sample containing the required number of frames is choosen randomly to represent this frame"""
+        a sample containing the required number of frames is choosen randomly to represent this frame
+        """
+        
         frames = []
         for mel in tqdm(training_mels, desc="Extracting training frames"):
             if mel.shape[0] == configs.global_frames_count:
@@ -207,6 +223,7 @@ class EncoderUtils:
         Speaker centroid is the normalized mean of the embeddings corresponding to the speaker's melspectrograms in the training batch.\n
         Similarity matrix is simply the result of dot products of all embeddings against every speaker centroid.
         """
+        
         speakers_count, mels_count_per_speaker = embeddings.shape[:2]
         
         speakers_centroids = mean(embeddings, dim=1, keepdim=True)
@@ -234,6 +251,7 @@ class EncoderUtils:
             2nd (columns) --> melspectrograms\n
             3rd (depth of each cell) --> embedding size
         """
+        
         return embeddings.view((configs.speakers_count_per_iteration, configs.mels_count_per_speaker, INFER_EMBEDDING_SIZE)).to(device)
 
     @staticmethod
@@ -242,6 +260,7 @@ class EncoderUtils:
 
         It gives insight about the value of the false acceptance rate when it equals false rejection rate
         """
+        
         with no_grad():
             actual_labels = np.array([np.eye(1, speakers_count, original_value, dtype=np.int)[0] for original_value in ground_truth])
             predicted_labels = sim_matrix.detach().cpu().numpy()
@@ -255,7 +274,9 @@ class EncoderUtils:
         """Returns positions of partitioning both the audio waveform and the mel spectrogram
         
         Partitioning improves the performance and the accuracy of inference.\n
-        Each partition overlaps with half of its preceeding and following paritions. Paritions cover at least 75 percent of the audio"""
+        Each partition overlaps with half of its preceeding and following paritions. Paritions cover at least 75 percent of the audio
+        """
+        
         samples_per_frame, step_size, steps_count = EncoderUtils.get_partitioning_configurations(configs, audio_length)
         audio_partition_positions = []
         mel_partition_positions = []
@@ -279,8 +300,10 @@ class EncoderUtils:
         Number of samples per frame is calculated as a function of the global sampling rate and the window step size in the configurations.
         The step size is calculated as half the global frames count in an audio so that each window contains a number of frames equal to the global frames count
         in which half of them overlap with the previous window and the other half overlaps with the next window. Steps count is calculated so that it is at least
-        one step to ensure having at least one window that satisfies the global frames count configuration."""
-        samples_per_frame = int((configs.global_sampling_rate * configs.mel_window_step / 1000))
+        one step to ensure having at least one window that satisfies the global frames count configuration.
+        """
+        
+        samples_per_frame = int((configs.global_sampling_rate * (configs.mel_window_step / 1000)))
         total_frames_count = int(np.ceil((audio_length + 1) / samples_per_frame))
         step_size = max(int(np.round(configs.global_frames_count * 0.5)), 1)
         steps_count = max(1, total_frames_count - configs.global_frames_count + step_size + 1)
@@ -288,7 +311,9 @@ class EncoderUtils:
 
     @staticmethod
     def calculate_coverage_until_second_last_parition(audio_length, audio_partition_positions):
-        """Return the percenatge of the audio that is covered by the calculated paritions from the first parition up until the second last partition"""
+        """Return the percenatge of the audio that is covered by the calculated paritions from the first parition up until the second last partition
+        """
+        
         last_audio_parition_position = audio_partition_positions[-1]
         coverage = (audio_length - last_audio_parition_position.start) / (last_audio_parition_position.stop - last_audio_parition_position.start)
         return coverage

@@ -42,13 +42,13 @@ class EncoderConfiguration:
         self.global_sampling_rate = config["ENCODER"]["PREPROCESSING"]["SAMPLING_RATE"]
         self.average_amplitude_target_dBFS = config[
             "ENCODER"]["PREPROCESSING"]["AMPLITUDE_DBFS"]
-        voice_activity_window_msecs = config["ENCODER"]["PREPROCESSING"]["VAD_WINDOW_MS"]
+        voice_activity_window = config["ENCODER"]["PREPROCESSING"]["VAD_WINDOW_MS"]
         self.max_silence = config["ENCODER"]["PREPROCESSING"]["MAX_SILENCE"]
-        self.samples_per_voice_activity_window = (voice_activity_window_msecs * self.global_sampling_rate) // 1000
+        self.samples_per_voice_activity_window = (voice_activity_window * self.global_sampling_rate) // 1000
         self.moving_average_width = config["ENCODER"]["PREPROCESSING"]["VAD_MOVING_AVG_WIDTH"]
 
-        self.mel_window_width = config["ENCODER"]["MEL_SPECTROGRAM"]["MEL_WINDOW_WIDTH"]
-        self.mel_window_step = config["ENCODER"]["MEL_SPECTROGRAM"]["MEL_WINDOW_STEP"]
+        self.mel_window_width = config["ENCODER"]["MEL_SPECTROGRAM"]["MEL_WINDOW_WIDTH_MS"]
+        self.mel_window_step = config["ENCODER"]["MEL_SPECTROGRAM"]["MEL_WINDOW_STEP_MS"]
         self.mel_channels_count = config["ENCODER"]["MEL_SPECTROGRAM"]["MEL_CHANNELS_COUNT"]
         self.global_frames_count = config["ENCODER"]["MEL_SPECTROGRAM"]["FRAMES_MIN_COUNT"]
 
