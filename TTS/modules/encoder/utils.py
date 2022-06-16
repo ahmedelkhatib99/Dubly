@@ -27,7 +27,7 @@ class EncoderUtils:
         return [speaker_dir + "\\" + file for file in os.listdir(speaker_dir) if os.path.isfile(speaker_dir + "\\" + file) and file.endswith(".mp3")]
 
     @staticmethod
-    def convert_audio_to_mel_spectrogram_frames(configs: EncoderConfiguration, should_suppress_noise, audio):
+    def convert_audio_to_melspectrogram_frames(configs: EncoderConfiguration, should_suppress_noise, audio):
         """Returns audio converted from waveform to mel spectogram to be easier to handle.
         
         Set should_suppress_noise to true especially while training to improve it.\n
