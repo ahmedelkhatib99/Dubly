@@ -162,3 +162,4 @@ evaluation/test_filelists/lr*.txt
 *.webm
 *.mp3
 *.pt
+node_modules/*
