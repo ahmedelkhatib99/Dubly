@@ -21,9 +21,9 @@ exports.translate = async (req, res, next) => {
             // Do something with the data returned from python script
             result = data.toString().trim();
             res.status(200).json({
-            Result: result,
+            Result: 'http://localhost:8080/static/'+result,
             status: 'success',
-            message: "Video translated successfuly!"
+            message: "Video translated successfully!"
             })
         });
         
