@@ -69,7 +69,7 @@ class Encoder(nn.Module):
                         if len(mel_frames) < self.configs.global_frames_count:
                             continue
                         else:
-                            EncoderUtils.save_mel(self.configs, mel_frames, audio_path)
+                            EncoderUtils.save_mel(self.configs, mel_frames, audio_path, speaker_path)
 
     def forward(self, samples, hidden_init=None):
         """Returns normalized embeddings corresponding to the samples of a speaker.

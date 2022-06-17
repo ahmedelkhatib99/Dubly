@@ -23,8 +23,13 @@ class EncoderUtils:
     def get_speaker_audios(speaker_dir):
         """Returns the paths of audio files inside the directory of a certain speaker
         """
-        
-        return [speaker_dir + "\\" + file for file in os.listdir(speaker_dir) if os.path.isfile(speaker_dir + "\\" + file) and file.endswith(".mp3")]
+        speaker_audios = []
+        for subfolder in os.listdir(speaker_dir):
+            for file in os.listdir(speaker_dir + "\\" + subfolder):
+                if os.path.isfile(speaker_dir + "\\" + subfolder + "\\" + file) and (file.endswith(".mp3") or file.endswith(".flac")):
+                    speaker_audios.append(speaker_dir + "\\" + subfolder + "\\" + file)
+        return speaker_audios
+        # return [speaker_dir + "\\" + file for file in os.listdir(speaker_dir) if os.path.isfile(speaker_dir + "\\" + file) and file.endswith(".mp3")]
 
     @staticmethod
     def convert_audio_to_melspectrogram_frames(configs: EncoderConfiguration, should_suppress_noise, audio):
@@ -166,10 +171,10 @@ class EncoderUtils:
         return binary_dilation(is_window_contains_speech, structure_element)
 
     @staticmethod
-    def save_mel(configs: EncoderConfiguration, mel_frames, audio_path):
+    def save_mel(configs: EncoderConfiguration, mel_frames, audio_path, speaker_path):
         """Saves melspectrogram as a binary file in the processing output folder and under the folder of speaker name
         """
-        output_folder = configs.preprocessing_output_folder + "\\" + os.path.dirname(audio_path).split("\\")[-1]
+        output_folder = configs.preprocessing_output_folder + "\\" + speaker_path.split("\\")[-1]
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
         np.save(output_folder + "\\" + os.path.split(audio_path)[1].split(".")[0]+'.npy', mel_frames)
