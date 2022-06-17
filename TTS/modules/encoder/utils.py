@@ -36,24 +36,31 @@ class EncoderUtils:
         """Returns audio converted from waveform to mel spectogram to be easier to handle.
         
         Set should_suppress_noise to true especially while training to improve it.\n
-        In case of noise suppression, the following is done:
+        """
+
+        audio_samples = audio
+        if should_suppress_noise:
+            audio_samples = EncoderUtils.suppress_noise(configs, audio)
+        mel_frames = EncoderUtils.get_mel_frames(configs, audio_samples)
+        return mel_frames
+
+    @staticmethod
+    def suppress_noise(configs: EncoderConfiguration, audio):
+        """Returns voice without noise or unnecessary silence
+
+        To suppress noise the following is done:
             1- Put the correctly sampled wave in 16 bit integer representation.\n
             2- Detect windows that contain voice and represent them with flags.\n
             3- Fill silence gaps that are within the acceptable range.\n
             4- Sample the audio at the positions that are considered to contain voice only.\n
         """
-        
-        audio_samples = audio
-        if should_suppress_noise:
-            voice_activity_detection = webrtcvad.Vad(mode=MOST_AGRESSIVE)
-            pcm = EncoderUtils.get_16_bit_pulse_code_modulation(audio)
-            is_window_contains_speech = EncoderUtils.detect_windows_containing_speech(configs, audio, pcm, voice_activity_detection)
-            is_window_contains_speech = EncoderUtils.fill_gaps(configs, is_window_contains_speech)
-            sample_positions = EncoderUtils.get_sample_positions(configs, is_window_contains_speech)
-            audio_samples = audio[sample_positions]
-        mel_frames = EncoderUtils.get_mel_frames(configs, audio_samples)
-            
-        return mel_frames
+        voice_activity_detection = webrtcvad.Vad(mode=MOST_AGRESSIVE)
+        pcm = EncoderUtils.get_16_bit_pulse_code_modulation(audio)
+        is_window_contains_speech = EncoderUtils.detect_windows_containing_speech(configs, audio, pcm, voice_activity_detection)
+        is_window_contains_speech = EncoderUtils.fill_gaps(configs, is_window_contains_speech)
+        sample_positions = EncoderUtils.get_sample_positions(configs, is_window_contains_speech)
+        audio_samples = audio[sample_positions]
+        return audio_samples
 
     @staticmethod
     def get_audio(configs: EncoderConfiguration, audio_path):
