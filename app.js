@@ -4,7 +4,7 @@ const app = express()
 const path = require('path')
 
 
-app.use('/static',express.static(path.join(__dirname, 'demo/output')))
+app.use('/static',express.static(path.join(__dirname, 'demo/output/videos')))
 app.use(express.json()) 
 app.use(cors());
 
