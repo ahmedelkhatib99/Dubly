@@ -165,3 +165,6 @@ evaluation/test_filelists/lr*.txt
 *.webm
 *.mp3
 *.pt
+SMT/english.json
+SMT/spanish.json
+SMT/translation_table.json
