@@ -303,7 +303,7 @@ class Synthesizer:
             mels = mels.detach().cpu().numpy()
             for m in mels:
                 # Trim silence from end of each spectrogram
-                while np.max(m[:, -1]) < self.tts_stop_threshold:
+                while np.max(m[:, -1]) < self.config.tts_stop_threshold:
                     m = m[:, :-1]
                 specs.append(m)
 

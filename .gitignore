@@ -16,6 +16,8 @@ TTS/pipeline/demo*
 
 # NMT
 NMT/translator-transformer/variables/variables.data-00000-of-00001
+NMT2/models/
+NMT2/dataset/
 
 # demo
 demo/
