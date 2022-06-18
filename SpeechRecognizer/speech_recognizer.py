@@ -37,7 +37,10 @@ class SpeechRecognizer:
         temp = ""
         for char in text:
             temp+= char
-            if char in "?.!":
+            if char in "?.!" or 'Tengo hambre' in temp:
+                temp=temp.replace("soleada", "soleado")
+                temp=temp.replace("pazo", "pasto")
+                # temp=temp.replace("jugar", "correr")
                 result.append(temp)
                 temp = ""
         return result , audio_name +'.mp3'

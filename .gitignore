@@ -16,6 +16,8 @@ TTS/pipeline/demo*
 
 # NMT
 NMT/translator-transformer/variables/variables.data-00000-of-00001
+NMT2/models/
+NMT2/dataset/
 
 # demo
 demo/
@@ -25,6 +27,7 @@ demo/
 
 # Distribution / packaging
 .Python
+node_modules/
 build/
 develop-eggs/
 dist/
@@ -162,4 +165,6 @@ evaluation/test_filelists/lr*.txt
 *.webm
 *.mp3
 *.pt
-node_modules/*
+SMT/english.json
+SMT/spanish.json
+SMT/translation_table.json

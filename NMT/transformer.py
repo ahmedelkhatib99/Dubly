@@ -78,7 +78,7 @@ def translate(spa_texts, eng_custom_standardization, spa_custom_standardization)
                 break
         decoded_sentence = decoded_sentence.replace("[start] ", "")
         decoded_sentence = decoded_sentence.replace(" [end]", "")
-        decoded_sentence = decoded_sentence + "."
+        decoded_sentence = decoded_sentence + input_sentence[-1]
         eng_texts.append(decoded_sentence)
         
     return ' '.join(eng_texts)
