@@ -35,6 +35,13 @@ class Encoder(nn.Module):
                          num_highways=num_highways)
 
     def forward(self, x, speaker_embedding=None):
+        """Returns features extracted form text together with the speaker emnedding
+        
+        Passes the character indices into a lookup table to return vector corresponding to each character (chraracter embedding),
+        then passes these vectors through a prenet that contains linear projections, relu and dropout operations,
+        the it passes the output of the prenet through a CBHG network that extracts features from the input sequence
+        Finally the speaker embedding is concatenated to the output"""
+
         x = self.embedding(x)
         x = self.pre_net(x)
         x.transpose_(1, 2)
@@ -44,13 +51,10 @@ class Encoder(nn.Module):
         return x
 
     def add_speaker_embedding(self, x, speaker_embedding):
-        # SV2TTS
-        # The input x is the encoder output and is a 3D tensor with size (batch_size, num_chars, tts_embed_dims)
-        # When training, speaker_embedding is also a 2D tensor with size (batch_size, speaker_embedding_size)
-        #     (for inference, speaker_embedding is a 1D tensor with size (speaker_embedding_size))
-        # This concats the speaker embedding for each char in the encoder output
+        """Returns the speaker embedding concatenated for each char in the encoder output
+        """
 
-        # Save the dimensions as human-readable names
+        # encoder output is of dimensions batch_size, num_chars, tts_embed_dims
         batch_size = x.size()[0]
         num_chars = x.size()[1]
 
@@ -59,16 +63,13 @@ class Encoder(nn.Module):
         else:
             idx = 1
 
-        # Start by making a copy of each speaker embedding to match the input text length
-        # The output of this has size (batch_size, num_chars * tts_embed_dims)
         speaker_embedding_size = speaker_embedding.size()[idx]
         e = speaker_embedding.repeat_interleave(num_chars, dim=idx)
 
-        # Reshape it and transpose
+        # e is of dimensions batch_size, num_chars * tts_embed_dims
         e = e.reshape(batch_size, speaker_embedding_size, num_chars)
         e = e.transpose(1, 2)
 
-        # Concatenate the tiled speaker embedding with the encoder output
         x = torch.cat((x, e), 2)
         return x
 
@@ -81,6 +82,9 @@ class BatchNormConv(nn.Module):
         self.relu = relu
 
     def forward(self, x):
+        """Returns the result of batch normalization after convolution
+        """
+
         x = self.conv(x)
         x = F.relu(x) if self.relu is True else x
         return self.bnorm(x)
@@ -119,13 +123,16 @@ class CBHG(nn.Module):
         self.rnn = nn.GRU(channels, channels // 2, batch_first=True, bidirectional=True)
         self._to_flatten.append(self.rnn)
 
-        # Avoid fragmentation of RNN parameters and associated warning
+        # Avoid warning due to fragmentation of RNN parameters
         self._flatten_parameters()
 
     def forward(self, x):
-        # Although we `_flatten_parameters()` on init, when using DataParallel
-        # the model gets replicated, making it no longer guaranteed that the
-        # weights are contiguous in GPU memory. Hence, we must call it again
+        """Returns features extracted by CBHG
+        
+        It passes the character embeddings through convolutions that model context, then a max pooling to improve
+        invariance and then 2 convolution projections before adding the projections, finally a highway is used to extract
+        highlevel features before applying RNN (Bidirectional GRU) to extract features from the sequence"""
+
         self._flatten_parameters()
 
         # Save these for later
@@ -183,25 +190,6 @@ class PreNet(nn.Module):
         return x
 
 
-class Attention(nn.Module):
-    def __init__(self, attn_dims):
-        super().__init__()
-        self.W = nn.Linear(attn_dims, attn_dims, bias=False)
-        self.v = nn.Linear(attn_dims, 1, bias=False)
-
-    def forward(self, encoder_seq_proj, query, t):
-
-        # print(encoder_seq_proj.shape)
-        # Transform the query vector
-        query_proj = self.W(query).unsqueeze(1)
-
-        # Compute the scores
-        u = self.v(torch.tanh(encoder_seq_proj + query_proj))
-        scores = F.softmax(u, dim=1)
-
-        return scores.transpose(1, 2)
-
-
 class LSA(nn.Module):
     def __init__(self, attn_dim, kernel_size=31, filters=32):
         super().__init__()
@@ -219,6 +207,10 @@ class LSA(nn.Module):
         self.attention = torch.zeros(b, t, device=device)
 
     def forward(self, encoder_seq_proj, query, t, chars):
+        """Returns scores of relevant encoder outputs for next decoder prediction
+        
+        Extends the additive attention mechanism to use cumulative attention weights from previous decoder time steps as an additional feature
+        """
 
         if t == 0: self.init_attention(encoder_seq_proj)
 
@@ -227,14 +219,13 @@ class LSA(nn.Module):
         location = self.cumulative.unsqueeze(1)
         processed_loc = self.L(self.conv(location).transpose(1, 2))
 
+        # unsmoothed scores
         u = self.v(torch.tanh(processed_query + encoder_seq_proj + processed_loc))
         u = u.squeeze(-1)
 
-        # Mask zero padding chars
-        u = u * (chars != 0).float()
+        u = u * (chars != 0).float() # remove zero paddings
 
-        # Smooth Attention
-        # scores = torch.sigmoid(u) / torch.sigmoid(u).sum(dim=1, keepdim=True)
+        # smoothed scores
         scores = F.softmax(u, dim=1)
         self.attention = scores
         self.cumulative = self.cumulative + self.attention
@@ -243,8 +234,6 @@ class LSA(nn.Module):
 
 
 class Decoder(nn.Module):
-    # Class variable because its value doesn't change between classes
-    # yet ought to be scoped by class because its a property of a Decoder
     max_r = 20
     def __init__(self, n_mels, encoder_dims, decoder_dims, lstm_dims,
                  dropout, speaker_embedding_size):
@@ -263,39 +252,43 @@ class Decoder(nn.Module):
         self.stop_proj = nn.Linear(encoder_dims + speaker_embedding_size + lstm_dims, 1)
 
     def zoneout(self, prev, current, p=0.1):
+        """ Forces some hidden units to maintain their previous values
+
+        At each timestep, zoneout stochastically forces some hidden units to maintain their previous values. 
+        Like dropout, zoneout uses random noise to train a pseudo-ensemble, improving generalization
+        """
+
         device = next(self.parameters()).device  # Use same device as parameters
         mask = torch.zeros(prev.size(), device=device).bernoulli_(p)
         return prev * mask + current * (1 - mask)
 
     def forward(self, encoder_seq, encoder_seq_proj, prenet_in,
                 hidden_states, cell_states, context_vec, t, chars):
+        """Create mel spectrograms based on cumulative attention weights from previous decoder time steps as an additional feature
+        """
 
-        # Need this for reshaping mels
         batch_size = encoder_seq.size(0)
 
-        # Unpack the hidden and cell states
         attn_hidden, rnn1_hidden, rnn2_hidden = hidden_states
         rnn1_cell, rnn2_cell = cell_states
 
         # PreNet for the Attention RNN
         prenet_out = self.prenet(prenet_in)
 
-        # Compute the Attention RNN hidden state
+        # rnn before attention
         attn_rnn_in = torch.cat([context_vec, prenet_out], dim=-1)
+        # apply attention
         attn_hidden = self.attn_rnn(attn_rnn_in.squeeze(1), attn_hidden)
 
-        # Compute the attention scores
         scores = self.attn_net(encoder_seq_proj, attn_hidden, t, chars)
 
-        # Dot product to create the context vector
-        context_vec = scores @ encoder_seq
+        context_vec = scores @ encoder_seq # dot product
         context_vec = context_vec.squeeze(1)
 
-        # Concat Attention RNN output w. Context Vector & project
         x = torch.cat([context_vec, attn_hidden], dim=1)
-        x = self.rnn_input(x)
+        x = self.rnn_input(x) # input projection before lstm
 
-        # Compute first Residual RNN
+        # First residual LSTM
         rnn1_hidden_next, rnn1_cell = self.res_rnn1(x, (rnn1_hidden, rnn1_cell))
         if self.training:
             rnn1_hidden = self.zoneout(rnn1_hidden, rnn1_hidden_next)
@@ -303,7 +296,7 @@ class Decoder(nn.Module):
             rnn1_hidden = rnn1_hidden_next
         x = x + rnn1_hidden
 
-        # Compute second Residual RNN
+        # Second residual LSTM
         rnn2_hidden_next, rnn2_cell = self.res_rnn2(x, (rnn2_hidden, rnn2_cell))
         if self.training:
             rnn2_hidden = self.zoneout(rnn2_hidden, rnn2_hidden_next)
@@ -311,13 +304,13 @@ class Decoder(nn.Module):
             rnn2_hidden = rnn2_hidden_next
         x = x + rnn2_hidden
 
-        # Project Mels
+        # Mels projections
         mels = self.mel_proj(x)
         mels = mels.view(batch_size, self.n_mels, self.max_r)[:, :, :self.r]
         hidden_states = (attn_hidden, rnn1_hidden, rnn2_hidden)
         cell_states = (rnn1_cell, rnn2_cell)
 
-        # Stop token prediction
+        # Predict stop token
         s = torch.cat((x, context_vec), dim=1)
         s = self.stop_proj(s)
         stop_tokens = torch.sigmoid(s)
