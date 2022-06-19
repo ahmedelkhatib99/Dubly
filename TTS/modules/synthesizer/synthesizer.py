@@ -127,7 +127,7 @@ class Synthesizer:
             # Load Pre-trained embeddings
             self.encoder.prepare_for_inference()
             for wav_fpath, embed_fpath in fpaths:
-                embed = self.encoder.get_embedding_from_audio(audio_path)
+                embed = self.encoder.get_embeddings_from_audio(audio_path)
                 np.save(embed_fpath, embed, allow_pickle=False)
         
         metadata_file.close()
