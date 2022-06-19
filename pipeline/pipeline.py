@@ -41,7 +41,7 @@ class VideoPipeline:
         else: print(video_name)
 
 class SpeechToSpeechPipeline:
-    def __init__(self, mode):
+    def __init__(self, mode, translation_model):
         self.mode = mode
         #################################################################### Speech Recognizer ####################################################################
         self.speech_recognizer = SpeechRecognizer(self.mode)
@@ -63,7 +63,7 @@ class SpeechToSpeechPipeline:
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder + "\\videos")
         
-        self.smt_model = SMT()
+        if translation_model == 3: self.smt_model = SMT()
 
         
     def generate_spanish_to_english_speech(self, video_name, translation_model):
@@ -116,7 +116,7 @@ class SpeechToSpeechPipeline:
             print("\n"+"="*60 + "\nSaved audio output in \"demo\\output\" as %s\n" % self.cloned_audio_filename + "="*60)
         
 def execute_speech_pipline(video_name, mode, translation_model):
-    speechPipeline = SpeechToSpeechPipeline(mode)
+    speechPipeline = SpeechToSpeechPipeline(mode, translation_model)
     speechPipeline.generate_spanish_to_english_speech(video_name, translation_model)
 
 def execute_video_pipeline(video_name, mode):
