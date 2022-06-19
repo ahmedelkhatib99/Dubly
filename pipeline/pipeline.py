@@ -91,12 +91,12 @@ class SpeechToSpeechPipeline:
             print(english_text)
 
         if (self.mode == "verbose"): speech_generation_progress = tqdm(range(4), desc="Generating English Audio (voice-cloned)", disable=False)
-        embedding = self.encoder.get_embeddings_from_audio(audio_path)
+        embeddings = self.encoder.get_embeddings_from_audio(audio_path)
         if (self.mode == "verbose"): speech_generation_progress.update(1)
 
         text = [english_text]
-        embed = [embedding]
-        specs = self.synthesizer.synthesize_spectrograms(text, embed)
+        embeds = [embeddings]
+        specs = self.synthesizer.synthesize_spectrograms(text, embeds)
         spec = specs[0]
         if (self.mode == "verbose"): speech_generation_progress.update(1)
 
