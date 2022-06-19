@@ -15,6 +15,7 @@ from NMT.transformer import eng_custom_standardization, spa_custom_standardizati
 from SpeechRecognizer.speech_recognizer import SpeechRecognizer
 from LipSync.inference import LipSyncing
 from NMT2.translate import translate as translate_nmt2
+from SMT.translate import SMT
 
 class VideoPipeline:
     def __init__(self, mode):
@@ -61,6 +62,8 @@ class SpeechToSpeechPipeline:
         self.output_folder = os.path.join(os.path.dirname(__file__), "..\\demo\\output")
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder + "\\videos")
+        
+        self.smt_model = SMT()
 
         
     def generate_spanish_to_english_speech(self, video_name, translation_model):
@@ -80,6 +83,8 @@ class SpeechToSpeechPipeline:
             english_text = translate(spanish_text, eng_custom_standardization=eng_custom_standardization, spa_custom_standardization=spa_custom_standardization)
         elif(translation_model==2): 
             english_text = ' '.join([translate_nmt2(sentence) for sentence in spanish_text])
+        elif(translation_model==3):
+            english_text = ' '.join([self.smt_model.translate(sentence) for sentence in spanish_text])
         if (self.mode == "verbose"):
             translation_progress.update(1)
             translation_progress.close()
@@ -119,7 +124,7 @@ def execute_video_pipeline(video_name, mode):
     videoPipeline.generate_video(video_name)
 
 def print_help_message():
-    print("Please run the command as follows: python pipeline.py -f filename -m silent/verbose\n -t 1 or 2 is optional to choose translation model")
+    print("Please run the command as follows: python pipeline.py -f filename -m silent/verbose\n -t 1 or 2 or 3 is optional to choose translation model")
     sys.exit(2)
 
 def main(argv):
@@ -127,7 +132,7 @@ def main(argv):
         opts, _ = getopt.getopt(argv, "hf:m:t:")
         if (len(opts) == 0) or (opts[0][0] == "-h"):
             print_help_message()
-        elif (len(opts) >= 2 and not (opts[0][0] == "-f" and opts[1][0] == "-m" and (opts[1][1] in ["silent", "verbose"]))) or (len(opts)==3 and opts[2][0] == "-t" and (opts[1][1] in ["1", "2"])):
+        elif (len(opts) >= 2 and not (opts[0][0] == "-f" and opts[1][0] == "-m" and (opts[1][1] in ["silent", "verbose"]))) or (len(opts)==3 and opts[2][0] == "-t" and (opts[1][1] in ["1", "2", "3"])):
                 print_help_message()
         else:
             video_name = opts[0][1]
