@@ -1,3 +1,5 @@
+from calendar import EPOCH
+import time
 import torch
 from torch import load
 import pandas as pd
@@ -11,6 +13,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "."))
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from sklearn.model_selection import train_test_split
+from torch.utils.data import Dataset, DataLoader
+import torch.optim as optim
+from pandas.core.indexing import IndexingError
+from torch import save
+from torch import load
 
 # CONFIGURATIONS
 device = torch.device("cpu")    
@@ -20,6 +28,22 @@ BATCH_SIZE = 64
 EMBEDDING_DIM = 256
 UNITS = 1024
 
+
+class MyData(Dataset):
+    def __init__(self, X, y):
+        self.data = X
+        self.target = y
+        self.length = [ np.sum(1 - np.equal(x, 0)) for x in X]
+        
+        
+    def __getitem__(self, index):
+        x = self.data[index]
+        y = self.target[index]
+        x_len = self.length[index]
+        return x,y,x_len
+    
+    def __len__(self):
+        return len(self.data)
 
 class Encoder(nn.Module):
     def __init__(self, vocab_size, embedding_dimension, encoder_units, batch_size):
@@ -124,8 +148,7 @@ def add_padding(x, max_len):
 def max_length(tensor):
         return max(len(t) for t in tensor)
 
-def translate(sentence_to_translate:str):
-    sentence_to_translate = preprocess(sentence_to_translate)
+def load_dataset():
     f = open(os.path.join(os.path.dirname(__file__), '.\\dataset\\spa.txt'), encoding='UTF-8').read().strip().split('\n')  
     dataset_lines=f
     pairs_count = 30000 
@@ -138,6 +161,14 @@ def translate(sentence_to_translate:str):
 
     spanish_indexer = Indexer(data["es"].values.tolist())
     english_indexer = Indexer(data["eng"].values.tolist())
+
+    return data, spanish_indexer, english_indexer
+
+def translate(sentence_to_translate:str):
+    sentence_to_translate = preprocess(sentence_to_translate)
+    
+    data, spanish_indexer, english_indexer = load_dataset()
+
     spanish_tensor = [[spanish_indexer.word2idx[s] for s in es.split(' ')]  for es in data["es"].values.tolist()]
 
     max_length_spanish = max_length(spanish_tensor)
@@ -183,3 +214,117 @@ def translate(sentence_to_translate:str):
             decoder_input = torch.tensor([[token_id]] * BATCH_SIZE)
         print("Prediction: ", ' '.join(output))
         return ' '.join(output)
+
+def sort_batch(X, y, lengths):
+    lengths, indx = lengths.sort(dim=0, descending=True)
+    X = X[indx]
+    y = y[indx]
+    return X.transpose(0,1), y, lengths
+
+def train():
+    
+    # Load the dataset and prepare it for training
+    data, spanish_indexer, english_indexer = load_dataset()
+    spa_train, _, en_train, _ = train_test_split(data["es"].values.tolist(), data["eng"].values.tolist(), test_size=0.2)
+    spa_tensor = [[spanish_indexer.word2idx[s] for s in es.split(' ')]  for es in spa_train]
+    en_tensor = [[english_indexer.word2idx[s] for s in eng.split(' ')]  for eng in en_train]
+
+    # inplace padding
+    max_length_spanish, max_length_en = max_length(spa_tensor), max_length(en_tensor)
+    spa_tensor = [add_padding(x, max_length_spanish) for x in spa_tensor]
+    en_tensor = [add_padding(x, max_length_en) for x in en_tensor]
+
+    # Define the hyperparameters
+    train_dataset = MyData(spa_tensor, en_tensor)
+    dataset = DataLoader(train_dataset, batch_size = BATCH_SIZE, 
+                        drop_last=True,
+                        shuffle=True)
+    spanish_vocab_size = len(spanish_indexer.word2idx)
+    english_vocab_size = len(english_indexer.word2idx)
+    BUFFER_SIZE = len(spa_tensor)
+    EPOCHS = 1
+    N_BATCH = BUFFER_SIZE//BATCH_SIZE
+
+    # Initialize the model
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    encoder = Encoder(spanish_vocab_size, EMBEDDING_DIM, UNITS, BATCH_SIZE)
+    decoder = Decoder(english_vocab_size, EMBEDDING_DIM, UNITS, UNITS, BATCH_SIZE)
+    encoder.to(device)
+    decoder.to(device)
+    optimizer = optim.Adam(list(encoder.parameters()) + list(decoder.parameters()), 
+                       lr=0.001)
+
+    # Train the model
+    
+    index=1
+    for epoch in range(EPOCHS):
+        start = time.time()
+        
+        if index%10 == 0:
+            save({'model_state': encoder.state_dict()},os.path.join(os.path.dirname(__file__), "./models/encoder-4"+str(index)+".pt"))
+            save({'model_state': decoder.state_dict()}, os.path.join(os.path.dirname(__file__), "./models/decoder-4"+str(index)+".pt"))
+            save({'model_state': optimizer.state_dict()}, os.path.join(os.path.dirname(__file__), "./models/opt-4"+str(index)+".pt")) 
+        encoder.train()
+        decoder.train()
+        index += 1
+        total_loss = 0
+        
+        for (batch, (spa, en, spa_len)) in enumerate(dataset):
+            loss = 0
+            
+            xs, ys, lens = sort_batch(spa, en, spa_len)
+            enc_output, enc_hidden = encoder(xs.to(device), lens, device)
+            dec_hidden = enc_hidden
+            
+            # use teacher forcing - feeding the target as the next input (via dec_input)
+            dec_input = torch.tensor([[english_indexer.word2idx['<start>']]] * BATCH_SIZE)
+            
+            # run code below for every timestep in the ys batch
+            for t in range(1, ys.size(1)):
+                predictions, dec_hidden, _ = decoder(dec_input.to(device), 
+                                            dec_hidden.to(device), 
+                                            enc_output.to(device))
+                loss += loss_function(ys[:, t].to(device), predictions.to(device))
+                #loss += loss_
+                dec_input = ys[:, t].unsqueeze(1)
+                
+            
+            batch_loss = (loss / int(ys.size(1)))
+            total_loss += batch_loss
+            
+            optimizer.zero_grad()
+            
+            loss.backward()
+
+            ### UPDATE MODEL PARAMETERS
+            optimizer.step()
+            
+            if batch % 100 == 0:
+                print('Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1,
+                                                            batch,
+                                                            batch_loss.detach().item()))
+            
+            
+        print('Epoch {} Loss {:.4f}'.format(epoch + 1,
+                                            total_loss / N_BATCH))
+        print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
+    
+    save({'model_state': encoder.state_dict()},os.path.join(os.path.dirname(__file__), "./models/encoder-4"+str(index)+".pt"))
+    save({'model_state': decoder.state_dict()}, os.path.join(os.path.dirname(__file__), "./models/decoder-4"+str(index)+".pt"))
+    save({'model_state': optimizer.state_dict()}, os.path.join(os.path.dirname(__file__), "./models/opt-4"+str(index)+".pt"))
+
+    
+
+
+criterion = nn.CrossEntropyLoss()
+def loss_function(real, pred):
+    """ Only consider non-zero inputs in the loss; mask needed """
+    #mask = 1 - np.equal(real, 0) # assign 0 to all above 0 and 1 to all 0s
+    #print(mask)
+    mask = real.ge(1).type(torch.cuda.FloatTensor)
+    
+    loss_ = criterion(pred, real) * mask 
+    return torch.mean(loss_)
+
+if __name__ == "__main__":
+    train()

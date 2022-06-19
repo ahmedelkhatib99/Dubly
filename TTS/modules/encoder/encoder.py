@@ -165,11 +165,11 @@ class Encoder(nn.Module):
         self.load_model(checkpoint_path, not TRAINING_MODE)
         self.turn_off_training_mode()
 
-    def get_embedding_from_audio(self, audio_path):
+    def get_embeddings_from_audio(self, audio_path):
         """Returns embeddings representing the speaker's voice in the specified audio
 
         It get the audio, converts it from waveform to melspectrogram, divides it into partitions, gets the embedding per
-        parition and then returns the average of these embeddings as the embedding that represents the speaker's voice
+        parition and then normalizes them (divides by average) and returns the normalized embeddings to represent the speaker's voice
         """
         audio = EncoderUtils.get_audio(self.configs, audio_path)
         audio_partition_positions, mel_partition_positions = EncoderUtils.get_partitioning_positions(self.configs, len(audio))

@@ -44,7 +44,7 @@ class VideoPipeline:
             sys.stdout.flush()
 
 class SpeechToSpeechPipeline:
-    def __init__(self, mode):
+    def __init__(self, mode, translation_model):
         self.mode = mode
         #################################################################### Speech Recognizer ####################################################################
         self.speech_recognizer = SpeechRecognizer(self.mode)
@@ -67,7 +67,7 @@ class SpeechToSpeechPipeline:
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder + "\\videos")
         
-        self.smt_model = SMT()
+        if translation_model == 3: self.smt_model = SMT()
 
         
     def generate_spanish_to_english_speech(self, video_name, translation_model):
@@ -95,12 +95,12 @@ class SpeechToSpeechPipeline:
             print(english_text)
 
         if (self.mode == "verbose"): speech_generation_progress = tqdm(range(4), desc="Generating English Audio (voice-cloned)", disable=False)
-        embedding = self.encoder.get_embedding_from_audio(audio_path)
+        embeddings = self.encoder.get_embeddings_from_audio(audio_path)
         if (self.mode == "verbose"): speech_generation_progress.update(1)
 
         text = [english_text]
-        embed = [embedding]
-        specs = self.synthesizer.synthesize_spectrograms(text, embed)
+        embeds = [embeddings]
+        specs = self.synthesizer.synthesize_spectrograms(text, embeds)
         spec = specs[0]
         if (self.mode == "verbose"): speech_generation_progress.update(1)
 
@@ -120,7 +120,7 @@ class SpeechToSpeechPipeline:
             print("\n"+"="*60 + "\nSaved audio output in \"demo\\output\" as %s\n" % self.cloned_audio_filename + "="*60)
         
 def execute_speech_pipline(video_name, mode, translation_model):
-    speechPipeline = SpeechToSpeechPipeline(mode)
+    speechPipeline = SpeechToSpeechPipeline(mode, translation_model)
     speechPipeline.generate_spanish_to_english_speech(video_name, translation_model)
 
 def execute_video_pipeline(video_name, mode):
