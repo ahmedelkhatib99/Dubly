@@ -23,6 +23,7 @@ class VideoPipeline:
         self.lip_syncing = LipSyncing()
         self.input_folder = os.path.join(os.path.dirname(__file__), "..\\demo\\input")
         self.output_folder = os.path.join(os.path.dirname(__file__), "..\\demo\\output")
+        #self.output_folder = os.path.join(os.path.dirname(__file__), "..\\..\\UI\\dubly-ui\\src\\output")
     
     def generate_video(self, video_name):
         if (self.mode == "verbose"): video_generation_progress = tqdm(range(1), desc="Generating Video", disable=False)
@@ -38,7 +39,9 @@ class VideoPipeline:
             video_generation_progress.update(1)
             video_generation_progress.close()
             print("\n"+"="*60 + "\nSaved video output in \"demo\\output\\videos\" as %s\n" %  video_name + "="*60)
-        else: print(video_name)
+        else: 
+            print(video_name)
+            sys.stdout.flush()
 
 class SpeechToSpeechPipeline:
     def __init__(self, mode, translation_model):
@@ -60,6 +63,7 @@ class SpeechToSpeechPipeline:
         if not os.path.exists(self.input_folder):
             os.makedirs(self.input_folder)
         self.output_folder = os.path.join(os.path.dirname(__file__), "..\\demo\\output")
+        #self.output_folder = os.path.join(os.path.dirname(__file__), "..\\..\\UI\\dubly-ui\\src\\output")
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder + "\\videos")
         

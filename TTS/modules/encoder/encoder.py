@@ -8,9 +8,9 @@ from torch import tensor, from_numpy, save, mean, norm, load, as_tensor
 from torch.nn.utils import clip_grad_norm_
 from tqdm import tqdm
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "."))
-from utils import EncoderUtils
-from encoder_config import EncoderConfiguration
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from encoder.utils import EncoderUtils
+from encoder.encoder_config import EncoderConfiguration
 
 TRAINING_MODE = True
 SHOULD_SUPPRESS_NOISE = True

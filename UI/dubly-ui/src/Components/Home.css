@@ -1,0 +1,37 @@
+.Home-div {
+    background-color: black;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-size: calc(10px + 2vmin);
+    color: white;
+    padding: 0 8%;
+}
+
+.Upload-div {
+    background-color: black;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 50%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-size: calc(10px + 2vmin);
+    color: white;
+    padding: 0 8%;
+}
+.Processing-div {
+    background-color: black;
+    background-image: url("./../wave2.gif");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 50%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-size: calc(10px + 1vmin);
+    color: white;
+    padding: 0 8%;
+}
