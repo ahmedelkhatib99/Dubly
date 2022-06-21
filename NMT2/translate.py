@@ -212,7 +212,7 @@ def translate(sentence_to_translate:str):
             output.append(english_indexer.idx2word[token_id])
             # print("Decoder Hidden: ", predictions.shape)
             decoder_input = torch.tensor([[token_id]] * BATCH_SIZE)
-        print("Prediction: ", ' '.join(output))
+        #print("Prediction: ", ' '.join(output))
         return ' '.join(output)
 
 def sort_batch(X, y, lengths):
